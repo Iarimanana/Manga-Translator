@@ -1,0 +1,161 @@
+body {
+  background: var(--bg-2);
+  padding: 24px 16px 48px;
+}
+
+.top,
+main {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.top > div {
+  flex: 1;
+}
+
+.top h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.top p {
+  margin: 2px 0 0;
+}
+
+.saved {
+  color: var(--ok);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.saved.show {
+  opacity: 1;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.card p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.field small {
+  font-weight: 400;
+}
+
+.switch span {
+  font-weight: 500;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline input {
+  flex: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.preview-wrap {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.grow {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.preview {
+  width: 220px;
+  min-height: 180px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-linear-gradient(45deg, #d9d9df 0 2px, transparent 2px 9px),
+    #f2f2f5;
+  border: 1px solid var(--border);
+}
+
+.bubble {
+  width: 150px;
+  height: 120px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 18px;
+  color: #111;
+  font-weight: 700;
+  line-height: 1.12;
+}
+
+.keys td {
+  padding: 4px 16px 4px 0;
+}
+
+output {
+  font-weight: 400;
+  color: var(--fg-2);
+  margin-left: 6px;
+}
+
+#test-result.ok {
+  color: var(--ok);
+}
+
+#test-result.err {
+  color: var(--err);
+}

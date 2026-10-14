@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manga Translator</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon32.png" alt="" width="24" height="24" />
+      <h1>Manga Translator</h1>
+      <button id="open-settings" class="ghost icon" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <div id="no-key" class="callout hidden">
+      <strong>Add your Anthropic API key</strong> to start translating.
+      <button id="add-key" class="primary small">Open settings</button>
+    </div>
+
+    <section id="page-tools">
+      <p id="status" class="muted">Looking for manga pages…</p>
+      <button id="translate-page" class="primary wide">
+        Translate this page <kbd>Alt</kbd><kbd>Shift</kbd><kbd>M</kbd>
+      </button>
+      <button id="select-region" class="wide">
+        Translate a selected area <kbd>Alt</kbd><kbd>Shift</kbd><kbd>S</kbd>
+      </button>
+      <div class="row">
+        <button id="toggle-overlays">Show originals</button>
+        <button id="clear-overlays">Clear</button>
+      </div>
+      <label class="switch">
+        <span>Auto-translate on <strong id="host">this site</strong></span>
+        <input type="checkbox" id="auto-site" />
+      </label>
+    </section>
+
+    <section id="unsupported" class="hidden">
+      <p class="muted">Pages can't be translated here (browser pages and the Chrome Web Store are off-limits to extensions). You can still translate files.</p>
+    </section>
+
+    <section>
+      <label class="field">
+        <span>Translate to</span>
+        <select id="target-lang"></select>
+      </label>
+      <button id="open-reader" class="wide">📄 Translate files — PDF, ZIP/CBZ, images</button>
+    </section>
+
+    <footer class="muted">
+      <span id="model"></span>
+      <span id="usage"></span>
+    </footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

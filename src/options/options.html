@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manga Translator — Settings</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img src="icons/icon48.png" alt="" width="36" height="36" />
+      <div>
+        <h1>Manga Translator settings</h1>
+        <p class="muted">Changes save automatically. <span id="saved" class="saved">Saved ✓</span></p>
+      </div>
+      <a class="btn" href="reader.html" target="_blank">📄 Translate files</a>
+    </header>
+
+    <main>
+      <section class="card" id="api">
+        <h2>Claude API</h2>
+        <p class="muted">
+          Pages are read and translated by Claude using your own Anthropic API key. Create a key in the
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>.
+          The key is stored only in this browser and is sent only to the Claude API.
+        </p>
+        <label class="field">
+          <span>API key</span>
+          <div class="inline">
+            <input type="password" data-key="apiKey" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+            <button id="toggle-key" type="button">Show</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Model</span>
+          <select id="model-select"></select>
+        </label>
+        <label class="field hidden" id="custom-model-row">
+          <span>Model ID</span>
+          <input type="text" id="custom-model" placeholder="claude-…" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>Effort <small class="muted">— how hard Claude thinks before answering. Low is fastest; raise it for tricky pages.</small></span>
+          <select data-key="effort">
+            <option value="low">Low (fastest)</option>
+            <option value="medium">Medium</option>
+            <option value="high">High (most careful)</option>
+          </select>
+        </label>
+        <label class="switch">
+          <span>Retry pages Claude declines on Anthropic's recommended fallback model <small class="muted">(Opus and Sonnet)</small></span>
+          <input type="checkbox" data-key="useFallbacks" />
+        </label>
+        <details>
+          <summary>Advanced</summary>
+          <label class="field">
+            <span>API base URL <small class="muted">— leave empty for api.anthropic.com; set it to use a gateway or proxy.</small></span>
+            <input type="url" data-key="baseURL" placeholder="https://api.anthropic.com" spellcheck="false" />
+          </label>
+        </details>
+        <div class="inline">
+          <button id="test" class="primary" type="button">Test connection</button>
+          <span id="test-result" class="muted"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Translation</h2>
+        <label class="field">
+          <span>Translate to</span>
+          <select data-key="targetLang" id="targetLang"></select>
+        </label>
+        <label class="field">
+          <span>Original language</span>
+          <select data-key="sourceLang" id="sourceLang"></select>
+        </label>
+        <label class="switch">
+          <span>Translate sound effects (SFX)</span>
+          <input type="checkbox" data-key="translateSfx" />
+        </label>
+        <label class="field">
+          <span>Custom instructions &amp; glossary <small class="muted">— e.g. character names, honorific style, tone.</small></span>
+          <textarea data-key="customInstructions" rows="4" placeholder="Keep Japanese honorifics (-san, -kun).&#10;ユウ = Yuu&#10;魔王 = the Demon Lord"></textarea>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Appearance</h2>
+        <div class="preview-wrap">
+          <div class="preview" id="preview" aria-label="Preview">
+            <div class="bubble"><span id="preview-text">Wait! You can read this now?!</span></div>
+          </div>
+          <div class="grow">
+            <label class="field">
+              <span>Font</span>
+              <select data-key="fontFamily" id="fontFamily">
+                <option value="comic">Comic (Comic Neue)</option>
+                <option value="sans">Sans-serif</option>
+                <option value="serif">Serif</option>
+                <option value="custom">Custom (installed font)</option>
+              </select>
+            </label>
+            <label class="field hidden" id="custom-font-row">
+              <span>Font name</span>
+              <input type="text" data-key="customFont" placeholder="e.g. Wild Words, CC Wild Words" />
+            </label>
+            <label class="field">
+              <span>Text size <output id="fontScale-out"></output></span>
+              <input type="range" data-key="fontScale" min="0.5" max="2" step="0.05" />
+            </label>
+            <label class="field">
+              <span>Overlay opacity <output id="overlayOpacity-out"></output></span>
+              <input type="range" data-key="overlayOpacity" min="0.3" max="1" step="0.05" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>On websites</h2>
+        <label class="switch">
+          <span>Show the “🍓 Translate” button when hovering over manga pages</span>
+          <input type="checkbox" data-key="showHoverButton" />
+        </label>
+        <label class="field">
+          <span>Auto-translate on these sites <small class="muted">— one hostname per line; pages translate as you scroll.</small></span>
+          <textarea data-key="autoSites" data-list rows="3" placeholder="example-manga-site.com"></textarea>
+        </label>
+        <label class="field">
+          <span>Never run on these sites</span>
+          <textarea data-key="disabledSites" data-list rows="2"></textarea>
+        </label>
+        <div class="grid">
+          <label class="field">
+            <span>Minimum image size (px)</span>
+            <input type="number" data-key="minImageSize" min="50" max="2000" step="10" />
+          </label>
+          <label class="field">
+            <span>Pages translated at once</span>
+            <input type="number" data-key="concurrency" min="1" max="8" step="1" />
+          </label>
+          <label class="field">
+            <span>Image resolution sent to Claude (px)</span>
+            <input type="number" data-key="maxImageEdge" min="768" max="2576" step="64" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Files (PDF / ZIP)</h2>
+        <label class="switch">
+          <span>Give Claude the previous page's dialogue for consistent names and terms (translates pages one at a time)</span>
+          <input type="checkbox" data-key="useContext" />
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Keyboard shortcuts</h2>
+        <table class="keys">
+          <tr><td><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>M</kbd></td><td>Translate every manga page on the tab</td></tr>
+          <tr><td><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>S</kbd></td><td>Select an area to translate (canvas readers, protected images)</td></tr>
+          <tr><td><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>O</kbd></td><td>Show / hide translations</td></tr>
+        </table>
+        <p class="muted">Click a translated bubble to peek at the original. <a href="#" id="shortcuts">Change shortcuts</a></p>
+      </section>
+
+      <section class="card">
+        <h2>Cache &amp; usage</h2>
+        <label class="switch">
+          <span>Cache translations so revisiting a page is instant and free</span>
+          <input type="checkbox" data-key="cacheEnabled" />
+        </label>
+        <p id="stats" class="muted">…</p>
+        <div class="inline">
+          <button id="clear-cache" type="button">Clear cache</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

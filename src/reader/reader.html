@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manga Translator — Files</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="reader.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <img src="icons/icon32.png" alt="" width="26" height="26" />
+      <div class="title">
+        <h1>Translate files</h1>
+        <span id="doc-info" class="muted"></span>
+      </div>
+      <div class="actions">
+        <select id="target-lang" title="Translate to"></select>
+        <button id="translate-all" class="primary" disabled>Translate all</button>
+        <button id="stop" class="hidden">Stop</button>
+        <span id="progress" class="muted"></span>
+        <button id="toggle" disabled>Show originals</button>
+        <button id="export" disabled title="Download every page with the translation drawn in">⬇ Export ZIP</button>
+        <label class="btn" title="Open more files">
+          + Files
+          <input type="file" id="file-input-2" multiple accept=".pdf,.zip,.cbz,image/*" hidden />
+        </label>
+        <a class="btn ghost" href="options.html" target="_blank" title="Settings">⚙</a>
+      </div>
+    </header>
+
+    <div id="no-key" class="callout hidden">
+      <strong>Add your Anthropic API key</strong> in <a href="options.html" target="_blank">settings</a> to start translating.
+    </div>
+
+    <main>
+      <section id="drop" class="drop">
+        <img src="icons/icon128.png" alt="" width="96" height="96" />
+        <h2>Drop manga files here</h2>
+        <p class="muted">PDF, ZIP / CBZ archives, or images (JPG, PNG, WebP, AVIF, GIF)</p>
+        <label class="btn primary big">
+          Choose files
+          <input type="file" id="file-input" multiple accept=".pdf,.zip,.cbz,image/*" hidden />
+        </label>
+        <p class="muted small">Files stay on your computer; only page images are sent to Claude for translation.</p>
+      </section>
+      <section id="pages" class="pages"></section>
+    </main>
+    <div id="drag-hint" class="drag-hint hidden">Drop to open</div>
+    <script type="module" src="reader.js"></script>
+  </body>
+</html>

@@ -1,0 +1,197 @@
+/* Shared design tokens and controls for the popup, settings and reader pages. */
+:root {
+  color-scheme: light dark;
+  --accent: #e63950;
+  --accent-hover: #cf2b42;
+  --accent-soft: #ffe8ec;
+  --bg: #ffffff;
+  --bg-2: #f6f6f8;
+  --bg-3: #ececf1;
+  --fg: #1d1d22;
+  --fg-2: #5b5b66;
+  --border: #e1e1e8;
+  --ok: #1f9d55;
+  --warn: #b7791f;
+  --err: #c62839;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #ff5c74;
+    --accent-hover: #ff7489;
+    --accent-soft: #3a1d24;
+    --bg: #17171b;
+    --bg-2: #1f1f25;
+    --bg-3: #2a2a32;
+    --fg: #ececf1;
+    --fg-2: #a3a3b0;
+    --border: #33333d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  accent-color: var(--accent);
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+button:hover:not(:disabled),
+.btn:hover {
+  background: var(--bg-3);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary,
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled),
+.btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='url'],
+select,
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg-2);
+  font: 600 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg-2);
+}
+
+.muted {
+  color: var(--fg-2);
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.switch input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.switch input:checked {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.switch input:checked::after {
+  transform: translateX(16px);
+}
+
+.callout {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.hidden {
+  display: none !important;
+}
