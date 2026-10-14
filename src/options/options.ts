@@ -1,7 +1,15 @@
 import { SOURCE_LANGUAGES, TARGET_LANGUAGES } from '../shared/languages';
 import type { Stats } from '../shared/messages';
 import { ensureFont } from '../shared/render';
-import { MODEL_OPTIONS, fontStack, loadSettings, saveSettings, type Settings } from '../shared/settings';
+import {
+  LOCAL_MODEL_SUGGESTIONS,
+  MODEL_OPTIONS,
+  fontStack,
+  loadSettings,
+  saveSettings,
+  type Provider,
+  type Settings,
+} from '../shared/settings';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 type Field = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -44,6 +52,12 @@ function updateOutputs(): void {
   $('fontScale-out').textContent = `${Math.round(settings.fontScale * 100)}%`;
   $('overlayOpacity-out').textContent = `${Math.round(settings.overlayOpacity * 100)}%`;
   $('custom-font-row').classList.toggle('hidden', settings.fontFamily !== 'custom');
+}
+
+function updateProvider(): void {
+  $('local').classList.toggle('hidden', settings.provider !== 'local');
+  $('api').classList.toggle('hidden', settings.provider !== 'claude');
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name=provider]')) r.checked = r.value === settings.provider;
 }
 
 function updatePreview(): void {
@@ -106,16 +120,33 @@ async function main(): Promise<void> {
     $('toggle-key').textContent = input.type === 'password' ? 'Show' : 'Hide';
   });
 
-  $('test').addEventListener('click', async () => {
-    const out = $('test-result');
-    out.className = 'muted';
-    out.textContent = 'Checking…';
-    const res = (await chrome.runtime.sendMessage({ type: 'testConnection' })) as
-      | { ok: true; name: string }
-      | { ok: false; error: string };
-    out.className = res.ok ? 'ok' : 'err';
-    out.textContent = res.ok ? `Connected — ${res.name} is ready.` : res.error;
-  });
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('button.test')) {
+    btn.addEventListener('click', async () => {
+      const out = btn.parentElement!.querySelector<HTMLElement>('.test-result')!;
+      out.className = 'test-result muted';
+      out.textContent = 'Checking…';
+      const res = (await chrome.runtime.sendMessage({ type: 'testConnection' })) as
+        | { ok: true; name: string }
+        | { ok: false; error: string };
+      out.className = `test-result ${res.ok ? 'ok' : 'err'}`;
+      out.textContent = res.ok ? `Connected — ${res.name} is ready.` : res.error;
+    });
+  }
+
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name=provider]')) {
+    r.addEventListener('change', async () => {
+      await save({ provider: r.value as Provider });
+      updateProvider();
+    });
+  }
+  for (const m of LOCAL_MODEL_SUGGESTIONS) $('local-models').appendChild(new Option(m, m));
+  for (const b of document.querySelectorAll<HTMLButtonElement>('button.preset')) {
+    b.addEventListener('click', () => {
+      $<HTMLInputElement>('localBaseURL').value = b.dataset.url!;
+      void save({ localBaseURL: b.dataset.url! });
+    });
+  }
+  updateProvider();
 
   $('clear-cache').addEventListener('click', async () => {
     await chrome.runtime.sendMessage({ type: 'clearCache' });

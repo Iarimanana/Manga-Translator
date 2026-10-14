@@ -1,7 +1,14 @@
 export type Effort = 'low' | 'medium' | 'high';
 export type FontChoice = 'comic' | 'sans' | 'serif' | 'custom';
+export type Provider = 'claude' | 'local';
 
 export interface Settings {
+  /** Which engine reads and translates pages. */
+  provider: Provider;
+  /** OpenAI-compatible endpoint of a local server (Ollama, LM Studio, llama.cpp, ...). */
+  localBaseURL: string;
+  /** Vision model name on the local server. */
+  localModel: string;
   /** Anthropic API key. Stored only in chrome.storage.local on this device. */
   apiKey: string;
   model: string;
@@ -47,7 +54,18 @@ export const MODEL_OPTIONS: ModelOption[] = [
   { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 — fastest, cheapest', fallbacks: false },
 ];
 
+export const LOCAL_PRESETS = [
+  { label: 'Ollama', baseURL: 'http://localhost:11434/v1' },
+  { label: 'LM Studio', baseURL: 'http://localhost:1234/v1' },
+];
+
+/** Vision models that read manga text reasonably well, smallest first. */
+export const LOCAL_MODEL_SUGGESTIONS = ['qwen2.5vl:3b', 'qwen2.5vl:7b', 'qwen3-vl:8b', 'gemma3:12b', 'qwen2.5vl:32b'];
+
 export const DEFAULT_SETTINGS: Settings = {
+  provider: 'claude',
+  localBaseURL: 'http://localhost:11434/v1',
+  localModel: 'qwen2.5vl:7b',
   apiKey: '',
   model: 'claude-opus-5-5',
   effort: 'low',
@@ -89,6 +107,9 @@ export function normalizeSettings(raw: Partial<Settings> | undefined | null): Se
   s.autoSites = Array.isArray(s.autoSites) ? s.autoSites.filter((x) => typeof x === 'string') : [];
   s.disabledSites = Array.isArray(s.disabledSites) ? s.disabledSites.filter((x) => typeof x === 'string') : [];
   s.model = (s.model || DEFAULT_SETTINGS.model).trim();
+  if (s.provider !== 'local') s.provider = 'claude';
+  s.localBaseURL = (s.localBaseURL || DEFAULT_SETTINGS.localBaseURL).trim().replace(/\/+$/, '');
+  s.localModel = (s.localModel || DEFAULT_SETTINGS.localModel).trim();
   s.apiKey = (s.apiKey || '').trim();
   s.baseURL = (s.baseURL || '').trim().replace(/\/+$/, '');
   return s;
@@ -139,4 +160,14 @@ export function hostOf(url: string): string {
   } catch {
     return '';
   }
+}
+
+/** Model identifier actually used for translations (for cache keys and display). */
+export function activeModel(s: Pick<Settings, 'provider' | 'model' | 'localModel'>): string {
+  return s.provider === 'local' ? `local:${s.localModel}` : s.model;
+}
+
+/** Whether the extension has what it needs to translate (an API key, or a local server). */
+export function isConfigured(s: Pick<Settings, 'provider' | 'apiKey'>): boolean {
+  return s.provider === 'local' || !!s.apiKey;
 }

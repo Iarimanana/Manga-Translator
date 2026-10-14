@@ -18,6 +18,55 @@
     </header>
 
     <main>
+      <section class="card">
+        <h2>Translation engine</h2>
+        <div class="choice" role="radiogroup">
+          <label class="option">
+            <input type="radio" name="provider" value="local" />
+            <span><strong>Local model on this computer</strong><br /><small class="muted">Free and private. Runs on your own GPU/CPU with Ollama or LM Studio; less accurate than Claude, especially on small vertical text.</small></span>
+          </label>
+          <label class="option">
+            <input type="radio" name="provider" value="claude" />
+            <span><strong>Claude (Anthropic API)</strong><br /><small class="muted">Best quality. Needs an Anthropic API key with credit (a Claude.ai subscription can't be used).</small></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" id="local">
+        <h2>Local model</h2>
+        <ol class="steps">
+          <li>Install <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama</a> (or LM Studio).</li>
+          <li>Download a vision model in a terminal: <code>ollama pull qwen2.5vl:7b</code> <small class="muted">(≈6 GB; needs ~8 GB of RAM/VRAM. Use <code>qwen2.5vl:3b</code> on smaller machines.)</small></li>
+          <li>Let the extension talk to Ollama: set the environment variable <code>OLLAMA_ORIGINS=chrome-extension://*</code> and restart Ollama.
+            <details><summary>How?</summary>
+              <p><strong>Windows:</strong> Settings → System → About → Advanced system settings → Environment Variables → New user variable <code>OLLAMA_ORIGINS</code> = <code>chrome-extension://*</code>, then quit Ollama from the tray and start it again.</p>
+              <p><strong>macOS:</strong> run <code>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"</code>, then quit and reopen Ollama.</p>
+              <p><strong>Linux (systemd):</strong> <code>sudo systemctl edit ollama</code>, add <code>[Service]</code> and <code>Environment="OLLAMA_ORIGINS=chrome-extension://*"</code>, then <code>sudo systemctl restart ollama</code>.</p>
+              <p><strong>LM Studio:</strong> Developer tab → start the server (enable CORS) and load a vision model.</p>
+            </details>
+          </li>
+          <li>Click <strong>Test connection</strong> below.</li>
+        </ol>
+        <label class="field">
+          <span>Server URL</span>
+          <div class="inline">
+            <input type="url" data-key="localBaseURL" id="localBaseURL" spellcheck="false" />
+            <button type="button" class="preset" data-url="http://localhost:11434/v1">Ollama</button>
+            <button type="button" class="preset" data-url="http://localhost:1234/v1">LM Studio</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Model <small class="muted">— the name as shown by <code>ollama list</code></small></span>
+          <input type="text" data-key="localModel" id="localModel" list="local-models" spellcheck="false" />
+          <datalist id="local-models"></datalist>
+        </label>
+        <p class="muted">Tip: lower <em>Image resolution sent to the model</em> (below) to 1024–1280 to speed up slower computers. Pages are translated one at a time.</p>
+        <div class="inline">
+          <button class="primary test" type="button">Test connection</button>
+          <span class="test-result muted"></span>
+        </div>
+      </section>
+
       <section class="card" id="api">
         <h2>Claude API</h2>
         <p class="muted">
@@ -60,8 +109,8 @@
           </label>
         </details>
         <div class="inline">
-          <button id="test" class="primary" type="button">Test connection</button>
-          <span id="test-result" class="muted"></span>
+          <button class="primary test" type="button">Test connection</button>
+          <span class="test-result muted"></span>
         </div>
       </section>
 
@@ -141,7 +190,7 @@
             <input type="number" data-key="concurrency" min="1" max="8" step="1" />
           </label>
           <label class="field">
-            <span>Image resolution sent to Claude (px)</span>
+            <span>Image resolution sent to the model (px)</span>
             <input type="number" data-key="maxImageEdge" min="768" max="2576" step="64" />
           </label>
         </div>

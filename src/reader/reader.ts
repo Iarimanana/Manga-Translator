@@ -7,7 +7,7 @@ import { TARGET_LANGUAGES, isRtl } from '../shared/languages';
 import type { TranslateResponse } from '../shared/messages';
 import { pageContext } from '../shared/prompt';
 import { OVERLAY_CSS, drawBlocksCanvas, ensureFont, renderBlocksDom, type OverlayStyle } from '../shared/render';
-import { fontStack, loadSettings, onSettingsChanged, saveSettings, type Settings } from '../shared/settings';
+import { fontStack, isConfigured, loadSettings, onSettingsChanged, saveSettings, type Settings } from '../shared/settings';
 import type { PageTranslation } from '../shared/types';
 
 GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs');
@@ -392,7 +392,7 @@ async function main(): Promise<void> {
   document.head.appendChild(css);
   void ensureFont();
 
-  $('no-key').classList.toggle('hidden', !!settings.apiKey);
+  $('no-key').classList.toggle('hidden', isConfigured(settings));
   const select = $<HTMLSelectElement>('target-lang');
   for (const l of TARGET_LANGUAGES) select.add(new Option(l.label, l.code, false, l.code === settings.targetLang));
   select.addEventListener('change', () => void saveSettings({ targetLang: select.value }));
@@ -400,7 +400,7 @@ async function main(): Promise<void> {
   onSettingsChanged((next) => {
     settings = next;
     select.value = next.targetLang;
-    $('no-key').classList.toggle('hidden', !!next.apiKey);
+    $('no-key').classList.toggle('hidden', isConfigured(next));
     renderAll();
   });
 

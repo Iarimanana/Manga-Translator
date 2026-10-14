@@ -1,7 +1,8 @@
 import type { BackgroundRequest, CaptureResponse, ContentCommand, TranslateResponse } from '../shared/messages';
-import { loadSettings } from '../shared/settings';
+import { isConfigured, loadSettings } from '../shared/settings';
 import { cacheClear } from './cache';
 import { testConnection } from './claude';
+import { testLocal } from './local';
 import { toTranslateError } from './errors';
 import { blobToDataUrl, cropScreenshot } from './image';
 import { getStats, translateImage } from './translator';
@@ -27,7 +28,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   });
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     const settings = await loadSettings();
-    if (!settings.apiKey) chrome.runtime.openOptionsPage();
+    if (!isConfigured(settings)) chrome.runtime.openOptionsPage();
   }
 });
 
@@ -99,7 +100,8 @@ async function handle(msg: BackgroundRequest, sender: chrome.runtime.MessageSend
       return { ok: true, dataUrl: await blobToDataUrl(blob) } satisfies CaptureResponse;
     }
     case 'testConnection': {
-      const name = await testConnection(await loadSettings());
+      const settings = await loadSettings();
+      const name = settings.provider === 'local' ? await testLocal(settings) : await testConnection(settings);
       return { ok: true, name };
     }
     case 'clearCache':

@@ -1,6 +1,6 @@
 import { TARGET_LANGUAGES } from '../shared/languages';
 import type { ContentCommand, ContentStatus, Stats } from '../shared/messages';
-import { MODEL_OPTIONS, hostOf, loadSettings, saveSettings } from '../shared/settings';
+import { MODEL_OPTIONS, hostOf, isConfigured, loadSettings, saveSettings } from '../shared/settings';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   const tabId = tab?.id;
   const host = hostOf(tab?.url ?? '');
 
-  $('no-key').classList.toggle('hidden', !!settings.apiKey);
+  $('no-key').classList.toggle('hidden', isConfigured(settings));
   const openSettings = () => {
     chrome.runtime.openOptionsPage();
     window.close();
@@ -64,7 +64,8 @@ async function main(): Promise<void> {
   select.addEventListener('change', () => void saveSettings({ targetLang: select.value }));
 
   const model = MODEL_OPTIONS.find((m) => m.id === settings.model);
-  $('model').textContent = model ? model.label.split(' — ')[0] : settings.model;
+  $('model').textContent =
+    settings.provider === 'local' ? `Local: ${settings.localModel}` : model ? model.label.split(' — ')[0] : settings.model;
   chrome.runtime.sendMessage({ type: 'getStats' }).then((res: { ok: boolean; stats: Stats }) => {
     if (res?.ok) {
       const u = res.stats.usage;

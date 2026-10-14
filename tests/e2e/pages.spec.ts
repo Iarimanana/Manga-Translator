@@ -69,8 +69,8 @@ test('settings page saves changes and tests the connection', async ({ context, e
   await page.goto(`chrome-extension://${extensionId}/options.html`);
   await expect(page.locator('#apiKey')).toHaveValue('test-key');
 
-  await page.click('#test');
-  await expect(page.locator('#test-result')).toHaveText('Connected — Mock Claude is ready.');
+  await page.locator('#api button.test').click();
+  await expect(page.locator('#api .test-result')).toHaveText('Connected — Mock Claude is ready.');
 
   await page.selectOption('#targetLang', 'es');
   await page.selectOption('#model-select', 'claude-haiku-5-5');
@@ -89,8 +89,8 @@ test('settings page saves changes and tests the connection', async ({ context, e
 
   await page.fill('#apiKey', 'bad-key');
   await page.locator('#apiKey').blur();
-  await page.click('#test');
-  await expect(page.locator('#test-result')).toContainText('rejected the API key');
+  await page.locator('#api button.test').click();
+  await expect(page.locator('#api .test-result')).toContainText('rejected the API key');
 });
 
 test('popup renders and offers file translation on pages it cannot script', async ({ context, extensionId, configure }) => {

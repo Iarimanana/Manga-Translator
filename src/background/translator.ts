@@ -2,10 +2,11 @@ import { assembleBlocks, finalizeBlocks, type TileResult } from '../shared/assem
 import { planTiles } from '../shared/geometry';
 import type { Stats } from '../shared/messages';
 import { PROMPT_VERSION, buildSystemPrompt, buildUserText } from '../shared/prompt';
-import { loadSettings, type Settings } from '../shared/settings';
+import { activeModel, isConfigured, loadSettings, type Settings } from '../shared/settings';
 import type { ImageSource, PageTranslation, Usage } from '../shared/types';
 import { cacheCount, cacheGet, cachePut } from './cache';
-import { translateWithClaude } from './claude';
+import { translateWithClaude, type PageRequest, type PageResponse } from './claude';
+import { translateWithLocal } from './local';
 import { TranslateError } from './errors';
 import { backgroundSampler, decodeImage, encodeTile, loadImageBlob, sha256Hex } from './image';
 
@@ -38,7 +39,7 @@ const inFlight = new Map<string, Promise<PageTranslation>>();
 export async function cacheKeyFor(imageHash: string, s: Settings, context: string): Promise<string> {
   const settingsPart = [
     PROMPT_VERSION,
-    s.model,
+    activeModel(s),
     s.targetLang,
     s.sourceLang,
     s.translateSfx ? 1 : 0,
@@ -57,10 +58,11 @@ export interface TranslateOptions {
 
 export async function translateImage(opts: TranslateOptions): Promise<PageTranslation> {
   const settings = await loadSettings();
-  if (!settings.apiKey) {
+  if (!isConfigured(settings)) {
     throw new TranslateError('no_api_key', 'Add your Anthropic API key in the extension settings to start translating.');
   }
-  semaphore.limit = settings.concurrency;
+  // A local GPU handles one page at a time; queueing beats thrashing it.
+  semaphore.limit = settings.provider === 'local' ? 1 : settings.concurrency;
 
   const blob = await loadImageBlob(opts.source);
   const bytes = await blob.arrayBuffer();
@@ -96,7 +98,9 @@ async function runPipeline(blob: Blob, settings: Settings, context: string): Pro
     const tiles = planTiles(width, height);
     const system = buildSystemPrompt(settings);
     const usage: Usage = { inputTokens: 0, outputTokens: 0 };
-    let model = settings.model;
+    let model = activeModel(settings);
+    const translate = (req: PageRequest): Promise<PageResponse> =>
+      settings.provider === 'local' ? translateWithLocal(settings, req) : translateWithClaude(settings, req);
 
     const results: TileResult[] = await Promise.all(
       tiles.map(async (tile, i) => {
@@ -109,7 +113,7 @@ async function runPipeline(blob: Blob, settings: Settings, context: string): Pro
           context: i === 0 ? context : undefined,
         });
         const res = await semaphore.run(() =>
-          translateWithClaude(settings, {
+          translate({
             system,
             userText,
             imageBase64: encoded.base64,

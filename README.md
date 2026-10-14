@@ -2,7 +2,7 @@
 
 # Manga Translator 🍓
 
-A Chrome extension that translates manga, manhwa and manhua **in place**, on any website, and also translates PDF, ZIP/CBZ and image files. It is an open-source rebuild of the features of the *Manga Translator 🍓 / Ichigo Reader* extension. Text detection, OCR and translation are done by **Claude** through your own Anthropic API key, so there is no account or subscription.
+A Chrome extension that translates manga, manhwa and manhua **in place**, on any website, and also translates PDF, ZIP/CBZ and image files. It is an open-source rebuild of the features of the *Manga Translator 🍓 / Ichigo Reader* extension. Text detection, OCR and translation are done either by a **free local vision model on your own computer** (Ollama or LM Studio) or by **Claude** through your own Anthropic API key. There is no account or subscription.
 
 | Ichigo feature | This extension |
 | --- | --- |
@@ -11,7 +11,7 @@ A Chrome extension that translates manga, manhwa and manhua **in place**, on any
 | Japanese / Korean / Chinese → English | ✅ Plus 34 other target languages, and English comics into other languages |
 | Upload PDF, ZIP and images | ✅ The **file translator** handles PDF, ZIP/CBZ and JPG/PNG/WebP/AVIF/GIF, and can **export a translated ZIP** |
 | Full context on PDFs/ZIPs | ✅ Each page is sent with the previous page's dialogue so names and terms stay consistent |
-| Subscription / free trial | Bring your own Anthropic API key; you pay Anthropic only for what you translate |
+| Subscription / free trial | Free with a local model, or bring your own Anthropic API key and pay only for what you translate |
 
 ## Features
 
@@ -31,8 +31,21 @@ npm run build          # outputs the unpacked extension to dist/
 ```
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the `dist/` folder.
-2. The settings page opens. Paste an [Anthropic API key](https://console.anthropic.com/settings/keys) and click **Test connection**.
+2. The settings page opens. Choose a translation engine (see below) and click **Test connection**.
 3. Open a manga page and hover an image, or press `Alt+Shift+M`.
+
+### Option A: free local model (Ollama)
+
+1. Install [Ollama](https://ollama.com/download).
+2. Download a vision model: `ollama pull qwen2.5vl:7b` (about 6 GB, needs about 8 GB of RAM/VRAM). Use `qwen2.5vl:3b` on smaller machines, or `qwen2.5vl:32b` / `qwen3-vl:8b` if you have the hardware.
+3. Allow browser extensions to call Ollama by setting `OLLAMA_ORIGINS=chrome-extension://*` and restarting Ollama. The settings page has per-OS instructions.
+4. In settings choose **Local model on this computer**. The defaults (`http://localhost:11434/v1`, `qwen2.5vl:7b`) match Ollama.
+
+LM Studio and other OpenAI-compatible servers (llama.cpp, vLLM) work too: set the server URL (LM Studio uses `http://localhost:1234/v1`) and the model name. Local pages are translated one at a time. Lower *Image resolution sent to the model* to 1024–1280 if it's slow. Local models are noticeably less accurate than Claude, especially on small or vertical Japanese text.
+
+### Option B: Claude
+
+Paste an [Anthropic API key](https://console.anthropic.com/settings/keys) with credit. A Claude.ai Pro/Max subscription can't be used by third-party tools.
 
 `npm run package` writes `release/manga-translator-<version>.zip`, ready for the Chrome Web Store. Works in Chrome, Edge, Brave and other Chromium browsers (Chrome 120+).
 
@@ -49,7 +62,7 @@ npm run build          # outputs the unpacked extension to dist/
 
 Shortcuts can be changed at `chrome://extensions/shortcuts`.
 
-## Cost, models and privacy
+## Cost, models and privacy (Claude)
 
 - **Model.** Default is **Claude Opus 5.5** at *low* effort, chosen for quality and responsiveness. Sonnet 5.5 and Haiku 5.5 are cheaper and faster options in settings, and any model ID can be entered. Raise *effort* for difficult pages.
 - **Cost.** A typical page is roughly 3–5k input tokens (mostly the image, at the default 2048 px resolution) and a few hundred output tokens. Lowering *Image resolution sent to Claude* reduces input tokens. Every page is cached, so you only pay once per page. Settings → *Cache & usage* shows your token totals.
@@ -73,7 +86,7 @@ draw overlay  ◀──────────────────  PageTra
 (fit text to balloon, track scroll/resize/clipping)
 ```
 
-- `src/background/` — service worker. The Claude call uses the official `@anthropic-ai/sdk` with structured outputs. Also image loading, tiling, cache (IndexedDB), context menu and shortcuts.
+- `src/background/` — service worker. The Claude call uses the official `@anthropic-ai/sdk` with structured outputs. `local.ts` talks to OpenAI-compatible local servers and repairs messy model JSON. Also image loading, tiling, cache (IndexedDB), context menu and shortcuts.
 - `src/content/` — on-page UI in a shadow DOM: hover button, overlays, area selection frames, auto-translate observers.
 - `src/reader/` — file translator (pdf.js, fflate) and export.
 - `src/shared/` — pure logic shared by all of the above: geometry and slicing, text fitting and layout, colour sampling, prompt, settings.

@@ -123,6 +123,26 @@ export async function startMockServer(): Promise<MockServer> {
       }
       return json(res, 200, messagesResponse(body));
     }
+    // OpenAI-compatible local server (what Ollama and LM Studio expose).
+    if (url.pathname === '/v1/chat/completions' && req.method === 'POST') {
+      const body = JSON.parse(raw);
+      apiRequests.push({ path: url.pathname, headers: req.headers, body });
+      const text: string = body.messages?.[1]?.content?.find((c: any) => c.type === 'text')?.text ?? '';
+      const m = text.match(/(\d+)×(\d+) pixels/);
+      const w = m ? Number(m[1]) : 1000;
+      const h = m ? Number(m[2]) : 1000;
+      // Small local models are messy: fenced JSON with [x0,y0,x1,y1] arrays and no bubble box.
+      const bbox = [0.42 * w, 0.12 * h, 0.58 * w, 0.3 * h].map(Math.round);
+      const content = '```json\n' + JSON.stringify({ blocks: [{ bbox, text: '待ってくれ！', translation: MOCK_TRANSLATION }] }) + '\n```';
+      return json(res, 200, {
+        model: body.model,
+        choices: [{ index: 0, message: { role: 'assistant', content } }],
+        usage: { prompt_tokens: 800, completion_tokens: 60 },
+      });
+    }
+    if (url.pathname === '/v1/models' && req.method === 'GET') {
+      return json(res, 200, { object: 'list', data: [{ id: 'qwen2.5vl:7b', object: 'model' }] });
+    }
     const model = url.pathname.match(/^\/v1\/models\/(.+)$/);
     if (model) {
       if (req.headers['x-api-key'] === 'bad-key') {
