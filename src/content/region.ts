@@ -1,4 +1,4 @@
-import { ensureFont, renderBlocksDom } from '../shared/render';
+import { ensureFont, renderBlocksDom, togglePeek } from '../shared/render';
 import type { PageTranslation } from '../shared/types';
 import { captureViewport, overlayStyle, requestTranslation, TranslateFailure, type OverlayManager } from './overlays';
 import { button, getUi, toast } from './ui';
@@ -110,8 +110,7 @@ export class RegionPanel {
     this.blocks = document.createElement('div');
     this.blocks.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%';
     this.blocks.addEventListener('click', (ev) => {
-      const block = (ev.target as Element).closest('.mt-block');
-      if (block) block.classList.toggle('mt-peek');
+      togglePeek(ev.target);
     });
     layer.appendChild(this.blocks);
 

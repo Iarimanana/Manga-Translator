@@ -14,6 +14,8 @@ const block = (
   bubble_box: { x_min: b[0], y_min: b[1], x_max: b[2], y_max: b[3] },
   original,
   translation,
+  emphasis: 'normal',
+  note: '',
 });
 
 describe('assembleBlocks', () => {

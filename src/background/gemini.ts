@@ -1,8 +1,8 @@
-import { modelOutputJsonSchema, type ModelOutput } from '../shared/schema';
+import { extractJson, parseEditorOutput, parsePageOutput } from '../shared/parse';
+import { EditorOutputSchema, jsonSchemaOf, modelOutputJsonSchema, type ModelOutput } from '../shared/schema';
 import type { Settings } from '../shared/settings';
-import type { PageRequest, PageResponse } from './claude';
+import type { EditRequest, EditResponse, PageRequest, PageResponse } from './claude';
 import { TranslateError } from './errors';
-import { parseLocalOutput } from './local';
 
 /**
  * Google Gemini through the Generative Language REST API. Works with a free Google AI
@@ -19,6 +19,7 @@ export function setGeminiFetchForTesting(f: typeof fetch | undefined, fastSleep 
 }
 
 const RESPONSE_SCHEMA = modelOutputJsonSchema();
+const EDITOR_SCHEMA = jsonSchemaOf(EditorOutputSchema);
 // Manga is full of fights and drama; don't let default filters drop ordinary pages.
 const SAFETY = ['HARASSMENT', 'HATE_SPEECH', 'SEXUALLY_EXPLICIT', 'DANGEROUS_CONTENT'].map((c) => ({
   category: `HARM_CATEGORY_${c}`,
@@ -93,20 +94,28 @@ async function call(s: GeminiSettings, url: string, init: RequestInit): Promise<
   }
 }
 
-export async function translateWithGemini(s: GeminiSettings, req: PageRequest): Promise<PageResponse> {
+interface GenerateResult {
+  text: string;
+  usage: { inputTokens: number; outputTokens: number };
+  model: string;
+}
+
+/** One generateContent call with a JSON schema, retrying temporary rate limits. */
+async function generate(
+  s: GeminiSettings,
+  system: string,
+  parts: unknown[],
+  schema: Record<string, unknown>,
+  what: string,
+): Promise<GenerateResult> {
   if (!s.geminiApiKey) {
     throw new TranslateError('no_api_key', 'Add your free Gemini API key in the extension settings to start translating.');
   }
   const url = `${s.geminiBaseURL}/models/${encodeURIComponent(s.geminiModel)}:generateContent`;
   const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: req.system }] },
-    contents: [
-      {
-        role: 'user',
-        parts: [{ inlineData: { mimeType: req.mediaType, data: req.imageBase64 } }, { text: req.userText }],
-      },
-    ],
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: RESPONSE_SCHEMA },
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts }],
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema },
     safetySettings: SAFETY,
   });
 
@@ -130,21 +139,20 @@ export async function translateWithGemini(s: GeminiSettings, req: PageRequest): 
       modelVersion?: string;
     };
     if (json.promptFeedback?.blockReason) {
-      throw new TranslateError('refusal', `Gemini blocked this page (${json.promptFeedback.blockReason}).`);
+      throw new TranslateError('refusal', `Gemini blocked ${what} (${json.promptFeedback.blockReason}).`);
     }
     const cand = json.candidates?.[0];
     const finish = cand?.finishReason ?? '';
     if (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION', 'IMAGE_SAFETY'].includes(finish)) {
-      throw new TranslateError('refusal', `Gemini declined to translate this page (${finish}).`);
+      throw new TranslateError('refusal', `Gemini declined ${what} (${finish}).`);
     }
-    if (finish === 'MAX_TOKENS') throw new TranslateError('api', 'Gemini stopped before finishing this page.');
-    const text = (cand?.content?.parts ?? [])
-      .filter((p) => !p.thought && typeof p.text === 'string')
-      .map((p) => p.text)
-      .join('');
+    if (finish === 'MAX_TOKENS') throw new TranslateError('api', `Gemini stopped before finishing ${what}.`);
     const u = json.usageMetadata ?? {};
     return {
-      output: denormalize(parseLocalOutput(text), req.width, req.height),
+      text: (cand?.content?.parts ?? [])
+        .filter((p) => !p.thought && typeof p.text === 'string')
+        .map((p) => p.text)
+        .join(''),
       usage: {
         inputTokens: u.promptTokenCount ?? 0,
         outputTokens: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),
@@ -152,6 +160,30 @@ export async function translateWithGemini(s: GeminiSettings, req: PageRequest): 
       model: `gemini:${json.modelVersion ?? s.geminiModel}`,
     };
   }
+}
+
+function parsed<T>(text: string, parse: (data: unknown) => T): T {
+  try {
+    return parse(extractJson(text));
+  } catch (err) {
+    throw new TranslateError('api', `Gemini's reply could not be read: ${(err as Error).message}`);
+  }
+}
+
+export async function translateWithGemini(s: GeminiSettings, req: PageRequest): Promise<PageResponse> {
+  const r = await generate(
+    s,
+    req.system,
+    [{ inlineData: { mimeType: req.mediaType, data: req.imageBase64 } }, { text: req.userText }],
+    RESPONSE_SCHEMA,
+    'this page',
+  );
+  return { output: denormalize(parsed(r.text, parsePageOutput), req.width, req.height), usage: r.usage, model: r.model };
+}
+
+export async function editWithGemini(s: GeminiSettings, req: EditRequest): Promise<EditResponse> {
+  const r = await generate(s, req.system, [{ text: req.userText }], EDITOR_SCHEMA, 'the editing pass');
+  return { output: parsed(r.text, parseEditorOutput), usage: r.usage, model: r.model };
 }
 
 /** Verify the key and model; returns the model's display name. */

@@ -4,7 +4,7 @@ import type { PageTranslation } from '../../src/shared/types';
 
 describe('buildSystemPrompt', () => {
   it('names the target and source languages', () => {
-    const p = buildSystemPrompt({ targetLang: 'pt-BR', sourceLang: 'ko', translateSfx: false, customInstructions: '' });
+    const p = buildSystemPrompt({ targetLang: 'pt-BR', sourceLang: 'ko', sfxStyle: 'none', adaptation: 'localize', customInstructions: '' });
     expect(p).toContain('into Brazilian Portuguese');
     expect(p).toContain('Source language: Korean.');
     expect(p).toContain('skip them entirely');
@@ -15,16 +15,20 @@ describe('buildSystemPrompt', () => {
     const p = buildSystemPrompt({
       targetLang: 'en',
       sourceLang: 'auto',
-      translateSfx: true,
+      sfxStyle: 'subtitle',
+      adaptation: 'notes',
       customInstructions: '  ユウ = Yuu  ',
     });
     expect(p).toContain('Include sound effects');
+    expect(p).toContain("translator's note");
     expect(p).toContain('Additional instructions and glossary from the reader');
     expect(p.trimEnd().endsWith('ユウ = Yuu')).toBe(true);
   });
 
   it('falls back to English for unknown codes', () => {
-    expect(buildSystemPrompt({ targetLang: 'xx', sourceLang: 'yy', translateSfx: false, customInstructions: '' })).toContain(
+    expect(
+      buildSystemPrompt({ targetLang: 'xx', sourceLang: 'yy', sfxStyle: 'none', adaptation: 'localize', customInstructions: '' }),
+    ).toContain(
       'into English',
     );
   });
@@ -34,6 +38,7 @@ describe('buildUserText', () => {
   it('states the image size and slice position', () => {
     const t = buildUserText({ width: 800, height: 1200, tileIndex: 1, tileCount: 3 });
     expect(t).toContain('800×1200 pixels');
+    expect(t).toContain('pixel coordinates');
     expect(t).toContain('slice 2 of 3');
   });
 

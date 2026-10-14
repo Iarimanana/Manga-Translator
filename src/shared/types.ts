@@ -17,6 +17,25 @@ export interface PixelBox {
 export const TEXT_KINDS = ['speech', 'thought', 'narration', 'sfx', 'sign', 'other'] as const;
 export type TextKind = (typeof TEXT_KINDS)[number];
 
+/** How a line is delivered, which drives the lettering style. */
+export const EMPHASES = ['normal', 'shout', 'whisper'] as const;
+export type Emphasis = (typeof EMPHASES)[number];
+
+/** Result of image cleaning for one block: the inpainted pixels to lay over the original. */
+export interface CleanPatch {
+  /** Area the patch covers, normalised to the page. */
+  rect: Rect;
+  /** Inpainted image of that area (data URL). */
+  image: string;
+}
+
+export interface QcIssue {
+  /** Index of the block in PageTranslation.blocks, or -1 for the whole page. */
+  block: number;
+  kind: 'leftover-source' | 'untranslated' | 'too-long' | 'editor';
+  message: string;
+}
+
 export interface TranslatedBlock {
   /** Tight box around the original lettering. */
   textRect: Rect;
@@ -29,6 +48,14 @@ export interface TranslatedBlock {
   bg: string;
   /** Text colour chosen for contrast with bg, as #rrggbb. */
   fg: string;
+  /** Delivery: shouting gets heavy lettering, whispers small light lettering. */
+  emphasis?: Emphasis;
+  /** Translator's note explaining a cultural reference, pun or term (may be empty). */
+  note?: string;
+  /** Colour of the original lettering (used to redraw sound effects). */
+  ink?: string;
+  /** Inpainted background for text drawn over artwork; absent for plain balloons. */
+  clean?: CleanPatch;
 }
 
 export interface Usage {
@@ -45,6 +72,10 @@ export interface PageTranslation {
   targetLang: string;
   createdAt: number;
   usage: Usage;
+  /** Automatic quality-control findings that are still open after editing. */
+  qc?: QcIssue[];
+  /** Which steps of the translation workflow ran ('translate', 'edit', 'qc', 'clean'). */
+  steps?: string[];
   /** True when the result came from the local cache. */
   cached?: boolean;
 }

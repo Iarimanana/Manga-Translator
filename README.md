@@ -23,6 +23,21 @@ A Chrome extension that translates manga, manhwa and manhua **in place**, on any
 - **Customisable:** target and source language, a glossary or custom instructions, whether to translate SFX, font (bundled Comic Neue, sans, serif, or any installed font), text size, overlay opacity, model, effort and concurrency.
 - **Context menu, keyboard shortcuts, popup.** Right-click an image and choose *Translate this image*, or use the toolbar popup.
 
+## The localisation workflow
+
+Every page goes through the same steps as a professional manga release. Choose **Full** (default) or **Quick** under *Settings → Localisation workflow*.
+
+| Step | What the extension does |
+| --- | --- |
+| 1. Translation & adaptation | A vision model reads the page and translates each balloon. It is briefed to preserve meaning, tone and each character's voice. Cultural references are either **localised** for English readers or kept and explained with **translator's notes** (your choice). |
+| 2. Editing & proofreading | A text-only **editor pass** reviews the whole page script, including the previous page and your glossary, for accuracy, natural flow, consistency and punctuation. It also rewrites lines to fit each balloon's measured character budget. |
+| 3. Image cleaning | Lettering in plain balloons is covered with the balloon's own paper colour. Lettering drawn over artwork is **inpainted**: the art behind it is rebuilt from the surrounding pixels. |
+| 4. Typesetting | Comic lettering in ALL CAPS (or sentence case) with balanced line breaks that fit inside the balloon. Shouts get heavy display lettering, whispers small light lettering, and thoughts italics. Pick an installed font such as Wild Words or Anime Ace under *Appearance*. |
+| 5. Sound effects | **Subtitle** (Yen Press / Kodansha / Seven Seas style: a small caption beside the original art), **Replace** (Viz style: the effect is cleaned off and redrawn in English in its original ink colour), or leave untranslated. |
+| 6. Quality control | Automatic checks for leftover source-language text, untranslated lines and text too long for its balloon. Problems are sent back to the editor once. Anything left is listed per page in the file translator. |
+
+Translator's notes appear as a ✱ on the bubble (hover to read) and as footnotes under exported pages. *Full* uses two requests per page (the editor pass is text-only and cheap); *Quick* uses one.
+
 ## Install (from source)
 
 ```bash

@@ -51,7 +51,12 @@ async function copyStatic() {
   await mkdir(path.join(dist, 'fonts'), { recursive: true });
   const font = path.join(root, 'node_modules/@fontsource/comic-neue');
   await cp(path.join(font, 'files/comic-neue-latin-700-normal.woff2'), path.join(dist, 'fonts/comic-neue-700.woff2'));
+  await cp(path.join(font, 'files/comic-neue-latin-400-normal.woff2'), path.join(dist, 'fonts/comic-neue-400.woff2'));
+  await cp(path.join(font, 'files/comic-neue-latin-700-italic.woff2'), path.join(dist, 'fonts/comic-neue-700-italic.woff2'));
   await cp(path.join(font, 'LICENSE'), path.join(dist, 'fonts/OFL-LICENSE.txt'));
+  const bangers = path.join(root, 'node_modules/@fontsource/bangers');
+  await cp(path.join(bangers, 'files/bangers-latin-400-normal.woff2'), path.join(dist, 'fonts/bangers-400.woff2'));
+  await cp(path.join(bangers, 'LICENSE'), path.join(dist, 'fonts/OFL-LICENSE-Bangers.txt'));
   const pdfjs = path.join(root, 'node_modules/pdfjs-dist');
   await cp(path.join(pdfjs, 'legacy/build/pdf.worker.min.mjs'), path.join(dist, 'pdf.worker.min.mjs'));
   for (const dir of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {

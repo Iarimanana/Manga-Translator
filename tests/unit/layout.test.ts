@@ -27,7 +27,7 @@ describe('layoutBlock', () => {
     expect(L.box.x1 - L.box.x0).toBeGreaterThan(text.x1 - text.x0 + 50);
     expect(L.box.x0).toBeGreaterThanOrEqual(0.35 * 800 - 1);
     expect(L.box.x1).toBeLessThanOrEqual(0.6 * 800 + 1);
-    expect(L.lines.join(' ')).toBe('Are you okay?');
+    expect(L.lines.join(' ')).toBe('ARE YOU OKAY?'); // comics are lettered in capitals by default
     expect(L.fontSize).toBeGreaterThan(8);
   });
 

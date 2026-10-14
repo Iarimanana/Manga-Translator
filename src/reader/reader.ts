@@ -3,11 +3,21 @@ import { zipSync, unzipSync } from 'fflate';
 // that predate them.
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { fileKind, isPageEntry, mimeFromName, naturalCompare } from '../shared/files';
-import { TARGET_LANGUAGES, isRtl } from '../shared/languages';
+import { TARGET_LANGUAGES } from '../shared/languages';
 import type { TranslateResponse } from '../shared/messages';
 import { pageContext } from '../shared/prompt';
-import { OVERLAY_CSS, drawBlocksCanvas, ensureFont, renderBlocksDom, type OverlayStyle } from '../shared/render';
-import { fontStack, isConfigured, loadSettings, onSettingsChanged, saveSettings, type Settings } from '../shared/settings';
+import {
+  OVERLAY_CSS,
+  drawBlocksCanvas,
+  ensureFont,
+  overlayStyleFrom,
+  pageNotes,
+  renderBlocksDom,
+  togglePeek,
+  type OverlayStyle,
+} from '../shared/render';
+import { wrapText } from '../shared/textfit';
+import { isConfigured, loadSettings, onSettingsChanged, saveSettings, type Settings } from '../shared/settings';
 import type { PageTranslation } from '../shared/types';
 
 GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs');
@@ -41,12 +51,7 @@ let showOriginals = false;
 let stopRequested = false;
 let running = false;
 
-const style = (): OverlayStyle => ({
-  fontStack: fontStack(settings),
-  fontScale: settings.fontScale,
-  opacity: settings.overlayOpacity,
-  rtl: isRtl(settings.targetLang),
-});
+const style = (): OverlayStyle => overlayStyleFrom(settings);
 
 // ---------------------------------------------------------------- loading files
 
@@ -170,6 +175,7 @@ function createPage(index: number, name: string, load: () => Promise<Blob>): Pag
       <button data-act="toggle" class="hidden">Original</button>
       <button data-act="save" class="hidden" title="Download this page with the translation">⬇</button>
     </div>
+    <ul class="qc hidden"></ul>
     <div class="frame"><img alt="" /><div class="layer"></div></div>`;
   el.querySelector('.name')!.textContent = name;
   const page: Page = {
@@ -193,7 +199,7 @@ function createPage(index: number, name: string, load: () => Promise<Blob>): Pag
     renderOverlay(page);
   });
   page.saveBtn.addEventListener('click', () => void downloadPage(page));
-  page.layer.addEventListener('click', (e) => (e.target as Element).closest('.mt-block')?.classList.toggle('mt-peek'));
+  page.layer.addEventListener('click', (e) => togglePeek(e.target));
   lazyLoader.observe(el);
   resizeObserver.observe(page.img);
   return page;
@@ -220,6 +226,18 @@ function setState(page: Page, state: PageState, text: string, cls = ''): void {
   page.actionBtn.disabled = state === 'pending';
   page.toggleBtn.classList.toggle('hidden', state !== 'done');
   page.saveBtn.classList.toggle('hidden', state !== 'done');
+}
+
+function showQc(page: Page, messages: string[]): void {
+  const list = page.el.querySelector<HTMLElement>('.qc')!;
+  list.replaceChildren(
+    ...messages.map((m) => {
+      const li = document.createElement('li');
+      li.textContent = m;
+      return li;
+    }),
+  );
+  list.classList.toggle('hidden', !messages.length);
 }
 
 function renderOverlay(page: Page): void {
@@ -290,7 +308,18 @@ async function translatePage(page: Page, force = false, context?: string): Promi
     page.result = res.result;
     page.showOriginal = false;
     const n = res.result.blocks.length;
-    setState(page, 'done', n ? `${n} bubble${n === 1 ? '' : 's'}${res.result.cached ? ' · cached' : ''}` : 'No text found', 'ok');
+    const steps = res.result.steps ?? [];
+    const issues = res.result.qc ?? [];
+    const summary = [
+      `${n} bubble${n === 1 ? '' : 's'}`,
+      steps.includes('edit') && 'edited & proofread',
+      steps.includes('qc') && (issues.length ? `QC: ${issues.length} note${issues.length === 1 ? '' : 's'}` : 'QC passed'),
+      res.result.cached && 'cached',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    setState(page, 'done', n ? summary : 'No text found', issues.length ? 'warn' : 'ok');
+    showQc(page, issues.map((i) => i.message));
     renderOverlay(page);
   } catch (err) {
     setState(page, 'error', (err as Error).message, 'err');
@@ -330,18 +359,41 @@ async function translateAll(): Promise<void> {
 
 // ---------------------------------------------------------------- export
 
+/** Lay out translator's notes as a footnote strip under the page. */
+function notesFooter(notes: string[], width: number): { lines: string[]; size: number; height: number } {
+  if (!notes.length) return { lines: [], size: 0, height: 0 };
+  const size = Math.max(12, Math.round(width * 0.018));
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  const measure = (t: string) => {
+    ctx.font = '400 100px system-ui, sans-serif';
+    return ctx.measureText(t).width;
+  };
+  const lines = notes.flatMap((n) => wrapText(`* ${n}`, width - size * 2, size, measure, true) ?? [n]);
+  return { lines, size, height: Math.round(lines.length * size * 1.35 + size * 1.4) };
+}
+
 async function renderTranslated(page: Page): Promise<Blob> {
   const bmp = await createImageBitmap(await ensureImage(page));
+  const st = style();
+  const footer = page.result && st.showNotes ? notesFooter(pageNotes(page.result), bmp.width) : notesFooter([], 0);
   const canvas = document.createElement('canvas');
   canvas.width = bmp.width;
-  canvas.height = bmp.height;
+  canvas.height = bmp.height + footer.height;
   const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bmp, 0, 0);
-  bmp.close();
   if (page.result) {
     await ensureFont();
-    drawBlocksCanvas(ctx, page.result, canvas.width, canvas.height, style());
+    await drawBlocksCanvas(ctx, page.result, bmp.width, bmp.height, st);
   }
+  if (footer.lines.length) {
+    ctx.fillStyle = '#222222';
+    ctx.font = `400 ${footer.size}px system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    footer.lines.forEach((line, i) => ctx.fillText(line, footer.size, bmp.height + footer.size * 0.7 + i * footer.size * 1.35));
+  }
+  bmp.close();
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/jpeg', 0.93),
   );

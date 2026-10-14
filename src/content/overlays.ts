@@ -1,7 +1,6 @@
-import { isRtl } from '../shared/languages';
 import type { CaptureResponse, ContentStatus, ErrorCode, TranslateResponse } from '../shared/messages';
-import { ensureFont, renderBlocksDom, type OverlayStyle } from '../shared/render';
-import { fontStack, type Settings } from '../shared/settings';
+import { ensureFont, overlayStyleFrom, renderBlocksDom, togglePeek, type OverlayStyle } from '../shared/render';
+import type { Settings } from '../shared/settings';
 import type { PageTranslation, Rect, ViewportRect } from '../shared/types';
 import {
   clippingAncestors,
@@ -49,7 +48,7 @@ export class TranslateFailure extends Error {
 const FULL: Rect = { x: 0, y: 0, w: 1, h: 1 };
 
 export function overlayStyle(s: Settings): OverlayStyle {
-  return { fontStack: fontStack(s), fontScale: s.fontScale, opacity: s.overlayOpacity, rtl: isRtl(s.targetLang) };
+  return overlayStyleFrom(s);
 }
 
 export async function requestTranslation(
@@ -258,11 +257,7 @@ export class OverlayManager {
       const blocks = document.createElement('div');
       blocks.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%';
       blocks.addEventListener('click', (ev) => {
-        const block = (ev.target as Element).closest('.mt-block');
-        if (block) {
-          ev.stopPropagation();
-          block.classList.toggle('mt-peek');
-        }
+        if (togglePeek(ev.target)) ev.stopPropagation();
       });
       for (const type of ['mousedown', 'pointerdown', 'mouseup', 'pointerup']) {
         blocks.addEventListener(type, (ev) => {

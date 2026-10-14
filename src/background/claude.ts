@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import { ModelOutputSchema, type ModelOutput } from '../shared/schema';
+import type { z } from 'zod';
+import { EditorOutputSchema, ModelOutputSchema, type EditorOutput, type ModelOutput } from '../shared/schema';
 import { modelSupportsFallbacks, type Settings } from '../shared/settings';
 import type { Usage } from '../shared/types';
 import { TranslateError } from './errors';
@@ -45,12 +46,29 @@ export interface PageResponse {
   model: string;
 }
 
-const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+/** Text-only request for the editor / proofreader pass. */
+export interface EditRequest {
+  system: string;
+  userText: string;
+}
 
-export async function translateWithClaude(
-  settings: Pick<Settings, 'apiKey' | 'baseURL' | 'model' | 'effort' | 'useFallbacks'>,
-  req: PageRequest,
-): Promise<PageResponse> {
+export interface EditResponse {
+  output: EditorOutput;
+  usage: Usage;
+  model: string;
+}
+
+const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+type ClaudeSettings = Pick<Settings, 'apiKey' | 'baseURL' | 'model' | 'effort' | 'useFallbacks'>;
+
+/** One structured-output Messages API call; the reply is validated against `schema`. */
+async function callClaude<S extends z.ZodType>(
+  settings: ClaudeSettings,
+  system: string,
+  content: Anthropic.Beta.BetaContentBlockParam[],
+  schema: S,
+  what: string,
+): Promise<{ output: z.infer<S>; usage: Usage; model: string }> {
   const client = createClient(settings);
   // Opus and Sonnet can decline a page their safety classifiers flag (violent or mature
   // manga sometimes trips them); a server-side fallback re-runs it on Anthropic's
@@ -60,36 +78,25 @@ export async function translateWithClaude(
   const response = await client.beta.messages.parse({
     model: settings.model,
     max_tokens: 16000,
-    system: req.system,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: req.mediaType, data: req.imageBase64 } },
-          { type: 'text', text: req.userText },
-        ],
-      },
-    ],
+    system,
+    messages: [{ role: 'user', content }],
     output_config: {
       effort: settings.effort,
-      format: betaZodOutputFormat(ModelOutputSchema),
+      format: betaZodOutputFormat(schema),
     },
     ...(fallback ? { betas: [SERVER_FALLBACK_BETA], fallbacks: 'default' as const } : {}),
   });
 
   if (response.stop_reason === 'refusal') {
     const category = response.stop_details?.category;
-    throw new TranslateError(
-      'refusal',
-      `Claude declined to translate this page${category ? ` (${category})` : ''}.`,
-    );
+    throw new TranslateError('refusal', `Claude declined to ${what}${category ? ` (${category})` : ''}.`);
   }
   if (response.stop_reason === 'max_tokens') {
     throw new TranslateError('api', 'The response was cut off before it finished. Try a smaller image or slice.');
   }
-  const output = response.parsed_output;
+  const output = response.parsed_output as z.infer<S> | null;
   if (!output) {
-    throw new TranslateError('api', 'Claude returned a response that could not be read as a translation.');
+    throw new TranslateError('api', `Claude returned a response that could not be read (${what}).`);
   }
   return {
     output,
@@ -102,6 +109,23 @@ export async function translateWithClaude(
     },
     model: response.model,
   };
+}
+
+export function translateWithClaude(settings: ClaudeSettings, req: PageRequest): Promise<PageResponse> {
+  return callClaude(
+    settings,
+    req.system,
+    [
+      { type: 'image', source: { type: 'base64', media_type: req.mediaType, data: req.imageBase64 } },
+      { type: 'text', text: req.userText },
+    ],
+    ModelOutputSchema,
+    'translate this page',
+  );
+}
+
+export function editWithClaude(settings: ClaudeSettings, req: EditRequest): Promise<EditResponse> {
+  return callClaude(settings, req.system, [{ type: 'text', text: req.userText }], EditorOutputSchema, 'edit this page');
 }
 
 /** Cheap credential + model check used by the settings page (no tokens are generated). */

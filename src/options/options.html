@@ -164,14 +164,56 @@
           <span>Original language</span>
           <select data-key="sourceLang" id="sourceLang"></select>
         </label>
-        <label class="switch">
-          <span>Translate sound effects (SFX)</span>
-          <input type="checkbox" data-key="translateSfx" />
-        </label>
         <label class="field">
           <span>Custom instructions &amp; glossary <small class="muted">— e.g. character names, honorific style, tone.</small></span>
           <textarea data-key="customInstructions" rows="4" placeholder="Keep Japanese honorifics (-san, -kun).&#10;ユウ = Yuu&#10;魔王 = the Demon Lord"></textarea>
         </label>
+      </section>
+
+      <section class="card" id="workflow">
+        <h2>Localisation workflow</h2>
+        <p class="muted">Each page goes through the steps of a professional release: translation &amp; adaptation → editing &amp; proofreading → image cleaning → typesetting → SFX → quality control.</p>
+        <label class="field">
+          <span>Workflow</span>
+          <select data-key="workflow">
+            <option value="full">Full: translator, then editor/proofreader and QC (best quality, 2 requests per page)</option>
+            <option value="quick">Quick: translator only (fastest, 1 request per page)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Cultural adaptation</span>
+          <select data-key="adaptation">
+            <option value="localize">Localise references, idioms and puns for English-speaking readers</option>
+            <option value="notes">Keep cultural terms and honorifics, explain them with translator's notes</option>
+          </select>
+        </label>
+        <label class="switch">
+          <span>Show translator's notes (✱ on the bubble; footnotes on exported pages)</span>
+          <input type="checkbox" data-key="showNotes" />
+        </label>
+        <label class="field">
+          <span>Image cleaning</span>
+          <select data-key="cleaning">
+            <option value="auto">Clean: flat fill in balloons, rebuild the artwork behind text drawn over art</option>
+            <option value="flat">Flat fill only (faster)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Sound effects (SFX)</span>
+          <select data-key="sfxStyle" id="sfxStyle">
+            <option value="subtitle">Subtitle: small caption beside the original art (Yen Press / Kodansha style)</option>
+            <option value="replace">Replace: clean the art and redraw the effect in English (Viz style)</option>
+            <option value="none">Leave untranslated</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Lettering</span>
+          <select data-key="letteringCase">
+            <option value="upper">ALL CAPS, like printed manga</option>
+            <option value="sentence">Sentence case</option>
+          </select>
+        </label>
+        <p class="muted">Typesetting picks lettering by delivery: heavy lettering for shouting, small light lettering for whispers, italics for thoughts, and balanced line breaks inside each balloon. Quality control checks for leftover Japanese, untranslated lines and text too long for its balloon, and sends problems back to the editor.</p>
       </section>
 
       <section class="card">
@@ -187,7 +229,7 @@
                 <option value="comic">Comic (Comic Neue)</option>
                 <option value="sans">Sans-serif</option>
                 <option value="serif">Serif</option>
-                <option value="custom">Custom (installed font)</option>
+                <option value="custom">Custom installed font (e.g. Wild Words, Anime Ace)</option>
               </select>
             </label>
             <label class="field hidden" id="custom-font-row">

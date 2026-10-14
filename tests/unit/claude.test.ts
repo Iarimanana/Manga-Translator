@@ -25,6 +25,8 @@ const output = {
       bubble_box: { x_min: 0, y_min: 10, x_max: 90, y_max: 140 },
       original: '待って！',
       translation: 'Wait!',
+      emphasis: 'shout',
+      note: '',
     },
   ],
 };

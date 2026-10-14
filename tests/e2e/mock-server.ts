@@ -27,6 +27,9 @@ export interface MockServer {
 }
 
 export const MOCK_TRANSLATION = 'Hello from the mock translator!';
+/** What the mock editor turns every line into during the editing pass. */
+export const MOCK_EDITED = 'Wait for me, you idiot!';
+export const MOCK_NOTE = 'Baka is a common Japanese insult.';
 
 const PAGES: Record<string, (alt: string) => string> = {
   'basic.html': () => `
@@ -50,6 +53,7 @@ const PAGES: Record<string, (alt: string) => string> = {
       img.src = '${alt}/img/page1.png';
     </script>`,
   'strip.html': () => `<img id="strip" src="/img/strip.png" style="width:600px">`,
+  'art.html': () => `<img id="art" src="/img/art.png" style="width:600px">`,
   'swap.html': () => `
     <img id="p1" src="/img/page1.png" style="width:600px">
     <button id="next" onclick="document.getElementById('p1').src='/img/page2.png'">next</button>`,
@@ -85,9 +89,30 @@ function messagesResponse(body: any): unknown {
         bubble_box: box(0.32, 0.07, 0.68, 0.35),
         original: '待ってくれ！',
         translation: MOCK_TRANSLATION,
+        emphasis: 'normal',
+        note: '',
       },
     ],
   };
+  return messageWith(body, output);
+}
+
+/** The editor pass sends text only: revise every line of the script. */
+function editorOutput(text: string): unknown {
+  const ids = text
+    .split('\n')
+    .filter((l) => l.startsWith('{'))
+    .map((l) => JSON.parse(l).id as number);
+  return {
+    blocks: ids.map((id) => ({ id, translation: MOCK_EDITED, emphasis: 'shout', note: id === 0 ? MOCK_NOTE : '' })),
+  };
+}
+
+export function isEditorRequest(content: any[]): boolean {
+  return !content.some((c) => c.type === 'image' || c.type === 'image_url' || c.inlineData);
+}
+
+function messageWith(body: any, output: unknown): unknown {
   return {
     id: `msg_mock_${Date.now()}`,
     type: 'message',
@@ -120,6 +145,10 @@ export async function startMockServer(): Promise<MockServer> {
       apiRequests.push({ path: url.pathname + url.search, headers: req.headers, body });
       if (req.headers['x-api-key'] === 'bad-key') {
         return json(res, 401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+      }
+      const content = body.messages[0].content;
+      if (isEditorRequest(content)) {
+        return json(res, 200, messageWith(body, editorOutput(content.find((c: any) => c.type === 'text').text)));
       }
       return json(res, 200, messagesResponse(body));
     }

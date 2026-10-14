@@ -14,6 +14,8 @@ export interface FitOptions {
   minSize: number;
   maxSize: number;
   lineHeight: number;
+  /** Re-break lines so they are evenly long (the way letterers shape text in a balloon). */
+  balance?: boolean;
 }
 
 export interface FitResult {
@@ -144,8 +146,40 @@ export function fitText(text: string, boxW: number, boxH: number, measure: Measu
       hi = mid - 1;
     }
   }
-  if (best) return { fontSize: best.size, lines: best.lines, overflow: false };
+  if (best) {
+    const lines = opts.balance ? balanceLines(text, best.lines.length, boxW, best.size, measure) : best.lines;
+    return { fontSize: best.size, lines, overflow: false };
+  }
 
   const lines = wrapText(text, boxW, minSize, measure, true) ?? [text];
   return { fontSize: minSize, lines, overflow: true };
+}
+
+/**
+ * Narrowest wrap that still needs no more than `maxLines` lines, so a 3-line balloon reads
+ * "WAIT, YOU / CAN READ / THIS NOW?!" instead of "WAIT, YOU CAN READ / THIS NOW?! / ..." .
+ */
+export function balanceLines(
+  text: string,
+  maxLines: number,
+  maxWidth: number,
+  fontSize: number,
+  measure: MeasureFn,
+): string[] {
+  const full = wrapText(text, maxWidth, fontSize, measure) ?? [text];
+  if (full.length <= 1 || maxLines <= 1) return full;
+  let lo = 1;
+  let hi = Math.ceil(maxWidth);
+  let best = full;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const lines = wrapText(text, mid, fontSize, measure);
+    if (lines && lines.length <= maxLines) {
+      best = lines;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return best;
 }

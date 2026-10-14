@@ -17,6 +17,8 @@ describe('parseLocalOutput', () => {
           bubble_box: { x_min: 0, y_min: 0, x_max: 50, y_max: 50 },
           original: 'あ',
           translation: 'Ah',
+          emphasis: 'whisper',
+          note: '',
         },
       ],
     };
@@ -35,6 +37,8 @@ describe('parseLocalOutput', () => {
         bubble_box: { x_min: 10, y_min: 20, x_max: 110, y_max: 220 },
         original: '待って',
         translation: 'Wait!',
+        emphasis: 'normal',
+        note: '',
       },
       {
         kind: 'speech',
@@ -42,6 +46,8 @@ describe('parseLocalOutput', () => {
         bubble_box: { x_min: 5, y_min: 6, x_max: 7, y_max: 80 },
         original: '',
         translation: 'Hm',
+        emphasis: 'normal',
+        note: '',
       },
     ]);
   });

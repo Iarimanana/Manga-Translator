@@ -1,7 +1,7 @@
 import { contrastText, snapPaper, toHex, type RGB } from './colors';
 import { centerY, dedupeBoxes, sanitizeBox, tileToImage, toRect, unionBox, type Tile } from './geometry';
 import type { ModelBlock } from './schema';
-import type { PixelBox, TextKind, TranslatedBlock } from './types';
+import type { Emphasis, PixelBox, TextKind, TranslatedBlock } from './types';
 
 export interface TileResult {
   tile: Tile;
@@ -17,6 +17,8 @@ export interface RawBlock {
   original: string;
   translation: string;
   kind: TextKind;
+  emphasis?: Emphasis;
+  note?: string;
 }
 
 const box = (b: ModelBlock['text_box']): PixelBox => ({ x0: b.x_min, y0: b.y_min, x1: b.x_max, y1: b.y_max });
@@ -36,7 +38,15 @@ export function assembleBlocks(results: TileResult[]): RawBlock[] {
       const bubble = unionBox(tileToImage(bubbleSent, tile, sentW, sentH), text);
       const cy = centerY(text);
       if (cy < tile.coreY0 || cy > tile.coreY1 || (cy === tile.coreY1 && !isLast)) continue;
-      out.push({ text, bubble, original: b.original.trim(), translation, kind: b.kind });
+      out.push({
+        text,
+        bubble,
+        original: b.original.trim(),
+        translation,
+        kind: b.kind,
+        emphasis: b.emphasis ?? 'normal',
+        note: (b.note ?? '').trim(),
+      });
     }
   }
   return dedupeBoxes(out);
@@ -57,6 +67,8 @@ export function finalizeBlocks(
       original: r.original,
       translation: r.translation,
       kind: r.kind,
+      emphasis: r.emphasis ?? 'normal',
+      note: r.note ?? '',
       bg: toHex(bg),
       fg: toHex(contrastText(bg)),
     };

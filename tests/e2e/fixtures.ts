@@ -53,7 +53,16 @@ export const test = base.extend<Fixtures>({
         async (settings) => {
           await chrome.storage.local.set({ settings });
         },
-        { apiKey: 'test-key', baseURL: mock.origin, model: 'claude-opus-5-5', ...patch },
+        // Older tests check exact single-pass output; the workflow spec opts back into the defaults.
+        {
+          apiKey: 'test-key',
+          baseURL: mock.origin,
+          model: 'claude-opus-5-5',
+          workflow: 'quick',
+          letteringCase: 'sentence',
+          cleaning: 'flat',
+          ...patch,
+        },
       );
     });
   },

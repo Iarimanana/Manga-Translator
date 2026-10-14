@@ -127,7 +127,10 @@ async function main(): Promise<CommandHandler> {
       next.customFont !== settings.customFont ||
       next.fontScale !== settings.fontScale ||
       next.overlayOpacity !== settings.overlayOpacity ||
-      next.targetLang !== settings.targetLang;
+      next.targetLang !== settings.targetLang ||
+      next.letteringCase !== settings.letteringCase ||
+      next.sfxStyle !== settings.sfxStyle ||
+      next.showNotes !== settings.showNotes;
     const wasAuto = autoEnabled();
     settings = next;
     manager.settings = next;

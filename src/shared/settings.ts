@@ -1,6 +1,15 @@
 export type Effort = 'low' | 'medium' | 'high';
 export type FontChoice = 'comic' | 'sans' | 'serif' | 'custom';
 export type Provider = 'claude' | 'gemini' | 'local';
+/** 'full' runs translate → edit/proofread → QC; 'quick' is a single translation pass. */
+export type WorkflowMode = 'full' | 'quick';
+/** Cultural references: adapt them for the reader, or keep them and add translator's notes. */
+export type Adaptation = 'localize' | 'notes';
+/** none: skip SFX. subtitle: small caption beside the original art. replace: clean and redraw. */
+export type SfxStyle = 'none' | 'subtitle' | 'replace';
+export type LetteringCase = 'upper' | 'sentence';
+/** auto: inpaint text over artwork, flat fill inside plain balloons. flat: always flat fill. */
+export type Cleaning = 'auto' | 'flat';
 
 export interface Settings {
   /** Which engine reads and translates pages. */
@@ -24,7 +33,15 @@ export interface Settings {
   baseURL: string;
   targetLang: string;
   sourceLang: string;
+  /** @deprecated kept so older saved settings migrate; use sfxStyle. */
   translateSfx: boolean;
+  workflow: WorkflowMode;
+  adaptation: Adaptation;
+  sfxStyle: SfxStyle;
+  letteringCase: LetteringCase;
+  cleaning: Cleaning;
+  /** Show translator's notes on the page. */
+  showNotes: boolean;
   /** Free-form instructions and glossary appended to the prompt. */
   customInstructions: string;
   fontFamily: FontChoice;
@@ -89,7 +106,13 @@ export const DEFAULT_SETTINGS: Settings = {
   baseURL: '',
   targetLang: 'en',
   sourceLang: 'auto',
-  translateSfx: false,
+  translateSfx: true,
+  workflow: 'full',
+  adaptation: 'localize',
+  sfxStyle: 'subtitle',
+  letteringCase: 'upper',
+  cleaning: 'auto',
+  showNotes: true,
   customInstructions: '',
   fontFamily: 'comic',
   customFont: '',
@@ -112,6 +135,18 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 /** Fill in defaults and coerce out-of-range values from older or hand-edited storage. */
 export function normalizeSettings(raw: Partial<Settings> | undefined | null): Settings {
   const s: Settings = { ...DEFAULT_SETTINGS, ...(raw ?? {}) };
+  // Settings saved before SFX styles existed only had an on/off switch.
+  if (raw && raw.sfxStyle === undefined && raw.translateSfx !== undefined) {
+    s.sfxStyle = raw.translateSfx ? 'subtitle' : 'none';
+  }
+  const pick = <T extends string>(v: T, allowed: readonly T[], d: T): T => (allowed.includes(v) ? v : d);
+  s.workflow = pick(s.workflow, ['full', 'quick'], 'full');
+  s.adaptation = pick(s.adaptation, ['localize', 'notes'], 'localize');
+  s.sfxStyle = pick(s.sfxStyle, ['none', 'subtitle', 'replace'], 'subtitle');
+  s.letteringCase = pick(s.letteringCase, ['upper', 'sentence'], 'upper');
+  s.cleaning = pick(s.cleaning, ['auto', 'flat'], 'auto');
+  s.showNotes = s.showNotes !== false;
+  s.translateSfx = s.sfxStyle !== 'none';
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   s.fontScale = clamp(num(s.fontScale, 1), 0.5, 2);
   s.overlayOpacity = clamp(num(s.overlayOpacity, 1), 0.3, 1);

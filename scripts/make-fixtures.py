@@ -42,6 +42,16 @@ def main() -> None:
     )
     Image.new("RGB", (64, 64), (230, 57, 80)).save(OUT / "icon.png")
 
+    # Lettering drawn straight onto artwork (a gradient sky), where the mock places its box:
+    # x 42-58%, y 12-30% of the page. Used to exercise inpainting.
+    art = Image.new("RGB", (800, 1200))
+    d = ImageDraw.Draw(art)
+    for y in range(1200):
+        d.line([(0, y), (800, y)], fill=(40 + y // 8, 90 + y // 12, 200 - y // 10))
+    for k in range(5):
+        d.rectangle([350, 160 + k * 40, 450, 180 + k * 40], fill="white")
+    art.save(OUT / "art.png", optimize=True)
+
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         for name, img in (("chapter/010.png", p2), ("chapter/002.png", p1)):

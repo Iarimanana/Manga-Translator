@@ -1,7 +1,8 @@
-import { ModelOutputSchema, modelOutputJsonSchema, type ModelOutput } from '../shared/schema';
+import { ParseError, extractJson, parseEditorOutput, parsePageOutput } from '../shared/parse';
+import { EditorOutputSchema, jsonSchemaOf, modelOutputJsonSchema, type ModelOutput } from '../shared/schema';
 import type { Settings } from '../shared/settings';
-import { TEXT_KINDS, type TextKind } from '../shared/types';
-import type { PageRequest, PageResponse } from './claude';
+import type { Usage } from '../shared/types';
+import type { EditRequest, EditResponse, PageRequest, PageResponse } from './claude';
 import { TranslateError } from './errors';
 
 /**
@@ -18,7 +19,7 @@ export function setLocalFetchForTesting(f: typeof fetch | undefined): void {
 
 /** Small models follow a concrete example far better than a schema description. */
 export const LOCAL_FORMAT_HINT = `Reply with JSON only, no other text, exactly in this shape:
-{"blocks":[{"kind":"speech","text_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"bubble_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"original":"...","translation":"..."}]}`;
+{"blocks":[{"kind":"speech","text_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"bubble_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"original":"...","translation":"...","emphasis":"normal","note":""}]}`;
 
 const RESPONSE_SCHEMA = modelOutputJsonSchema();
 const TIMEOUT_MS = 10 * 60 * 1000;
@@ -47,60 +48,32 @@ async function httpError(res: Response, base: string, model: string): Promise<Tr
   return new TranslateError('api', `Local model server error ${res.status} at ${base}: ${body || res.statusText}`);
 }
 
-const box = (v: unknown) => {
-  if (Array.isArray(v) && v.length === 4 && v.every((n) => typeof n === 'number' || typeof n === 'string')) {
-    const [x_min, y_min, x_max, y_max] = v.map(Number);
-    return { x_min, y_min, x_max, y_max };
-  }
-  if (v && typeof v === 'object') {
-    const o = v as Record<string, unknown>;
-    const pick = (...keys: string[]) => Number(keys.map((k) => o[k]).find((x) => x !== undefined));
-    return {
-      x_min: pick('x_min', 'xmin', 'x0', 'left'),
-      y_min: pick('y_min', 'ymin', 'y0', 'top'),
-      x_max: pick('x_max', 'xmax', 'x1', 'right'),
-      y_max: pick('y_max', 'ymax', 'y1', 'bottom'),
-    };
-  }
-  return undefined;
-};
-
-/**
- * Extract and repair the model's JSON. Local models often wrap it in prose or code fences,
- * emit <think> sections, use [x0,y0,x1,y1] arrays or omit fields.
- */
+/** Extract and repair a page result from a local model's reply. */
 export function parseLocalOutput(text: string): ModelOutput {
-  const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```(?:json)?/gi, '');
-  const start = cleaned.search(/[[{]/);
-  const end = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-  if (start < 0 || end < start) throw new TranslateError('api', 'The local model did not return JSON. Try a different model.');
-  let data: unknown;
   try {
-    data = JSON.parse(cleaned.slice(start, end + 1));
-  } catch {
-    throw new TranslateError('api', 'The local model returned malformed JSON. Try again or use a larger model.');
+    return parsePageOutput(extractJson(text));
+  } catch (err) {
+    if (err instanceof ParseError) {
+      throw new TranslateError('api', `${err.message} Try again or use a different model.`);
+    }
+    throw err;
   }
-  const exact = ModelOutputSchema.safeParse(data);
-  if (exact.success) return exact.data;
-
-  const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.blocks ?? []);
-  const blocks: ModelOutput['blocks'] = [];
-  for (const raw of Array.isArray(list) ? list : []) {
-    if (!raw || typeof raw !== 'object') continue;
-    const r = raw as Record<string, unknown>;
-    const text_box = box(r.text_box ?? r.bbox ?? r.box ?? r.bubble_box);
-    if (!text_box || Object.values(text_box).some((n) => !Number.isFinite(n))) continue;
-    const bubble = box(r.bubble_box);
-    const bubble_box = bubble && Object.values(bubble).every(Number.isFinite) ? bubble : text_box;
-    const translation = String(r.translation ?? r.translated ?? r.text_translated ?? '').trim();
-    if (!translation) continue;
-    const kind = (TEXT_KINDS as readonly string[]).includes(String(r.kind)) ? (r.kind as TextKind) : 'speech';
-    blocks.push({ kind, text_box, bubble_box, original: String(r.original ?? r.text ?? ''), translation });
-  }
-  return { blocks };
 }
 
-export async function translateWithLocal(settings: LocalSettings, req: PageRequest): Promise<PageResponse> {
+interface ChatResult {
+  text: string;
+  usage: Usage;
+  model: string;
+}
+
+/** One OpenAI-compatible chat completion with a JSON schema response format. */
+async function chat(
+  settings: LocalSettings,
+  system: string,
+  user: unknown[],
+  schemaName: string,
+  schema: Record<string, unknown>,
+): Promise<ChatResult> {
   const base = settings.localBaseURL;
   const doFetch = fetchOverride ?? fetch;
   let res: Response;
@@ -114,37 +87,58 @@ export async function translateWithLocal(settings: LocalSettings, req: PageReque
         temperature: 0,
         stream: false,
         messages: [
-          { role: 'system', content: `${req.system}\n\n${LOCAL_FORMAT_HINT}` },
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: `data:${req.mediaType};base64,${req.imageBase64}` } },
-              { type: 'text', text: req.userText },
-            ],
-          },
+          { role: 'system', content: system },
+          { role: 'user', content: user },
         ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'manga_page', strict: true, schema: RESPONSE_SCHEMA },
-        },
+        response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } },
       }),
     });
   } catch (err) {
     throw friendlyNetworkError(base, err);
   }
   if (!res.ok) throw await httpError(res, base, settings.localModel);
-
   const json = (await res.json()) as {
     model?: string;
     choices?: { message?: { content?: string } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
-  const content = json.choices?.[0]?.message?.content ?? '';
   return {
-    output: parseLocalOutput(content),
+    text: json.choices?.[0]?.message?.content ?? '',
     usage: { inputTokens: json.usage?.prompt_tokens ?? 0, outputTokens: json.usage?.completion_tokens ?? 0 },
     model: `local:${json.model ?? settings.localModel}`,
   };
+}
+
+export async function translateWithLocal(settings: LocalSettings, req: PageRequest): Promise<PageResponse> {
+  const r = await chat(
+    settings,
+    `${req.system}\n\n${LOCAL_FORMAT_HINT}`,
+    [
+      { type: 'image_url', image_url: { url: `data:${req.mediaType};base64,${req.imageBase64}` } },
+      { type: 'text', text: req.userText },
+    ],
+    'manga_page',
+    RESPONSE_SCHEMA,
+  );
+  return { output: parseLocalOutput(r.text), usage: r.usage, model: r.model };
+}
+
+export const EDITOR_FORMAT_HINT = `Reply with JSON only, exactly in this shape:
+{"blocks":[{"id":0,"translation":"...","emphasis":"normal","note":""}]}`;
+
+export async function editWithLocal(settings: LocalSettings, req: EditRequest): Promise<EditResponse> {
+  const r = await chat(
+    settings,
+    `${req.system}\n\n${EDITOR_FORMAT_HINT}`,
+    [{ type: 'text', text: req.userText }],
+    'manga_script',
+    jsonSchemaOf(EditorOutputSchema),
+  );
+  try {
+    return { output: parseEditorOutput(extractJson(r.text)), usage: r.usage, model: r.model };
+  } catch (err) {
+    throw new TranslateError('api', `The editor pass failed: ${(err as Error).message}`);
+  }
 }
 
 /** Check the server is up and the model is installed. */

@@ -1,14 +1,32 @@
 import { assembleBlocks, finalizeBlocks, type TileResult } from '../shared/assemble';
 import { planTiles } from '../shared/geometry';
 import type { Stats } from '../shared/messages';
-import { PROMPT_VERSION, buildSystemPrompt, buildUserText } from '../shared/prompt';
+import {
+  PROMPT_VERSION,
+  buildEditorPrompt,
+  buildEditorUserText,
+  buildSystemPrompt,
+  buildUserText,
+  type ScriptLine,
+} from '../shared/prompt';
+import { balloonCapacity, runQc } from '../shared/qc';
+import { toHex } from '../shared/colors';
+import { toPixelBox } from '../shared/geometry';
 import { activeModel, isConfigured, loadSettings, missingKeyMessage, type Settings } from '../shared/settings';
-import type { ImageSource, PageTranslation, Usage } from '../shared/types';
+import type { ImageSource, PageTranslation, QcIssue, TranslatedBlock, Usage } from '../shared/types';
 import { cacheCount, cacheGet, cachePut } from './cache';
-import { translateWithClaude, type PageRequest, type PageResponse } from './claude';
-import { translateWithGemini } from './gemini';
-import { translateWithLocal } from './local';
-import { TranslateError } from './errors';
+import {
+  editWithClaude,
+  translateWithClaude,
+  type EditRequest,
+  type EditResponse,
+  type PageRequest,
+  type PageResponse,
+} from './claude';
+import { cleanBlock } from './clean';
+import { editWithGemini, translateWithGemini } from './gemini';
+import { editWithLocal, translateWithLocal } from './local';
+import { TranslateError, toTranslateError } from './errors';
 import { backgroundSampler, decodeImage, encodeTile, loadImageBlob, sha256Hex } from './image';
 
 /** Limits how many Claude requests run at once across all tabs. */
@@ -43,7 +61,10 @@ export async function cacheKeyFor(imageHash: string, s: Settings, context: strin
     activeModel(s),
     s.targetLang,
     s.sourceLang,
-    s.translateSfx ? 1 : 0,
+    s.sfxStyle,
+    s.workflow,
+    s.adaptation,
+    s.cleaning,
     s.maxImageEdge,
     s.customInstructions.trim(),
     context.trim(),
@@ -92,22 +113,56 @@ export async function translateImage(opts: TranslateOptions): Promise<PageTransl
   return job;
 }
 
+/** Engine-specific calls for the two model steps of the workflow. */
+function engine(settings: Settings) {
+  switch (settings.provider) {
+    case 'local':
+      return {
+        translate: (r: PageRequest) => translateWithLocal(settings, r),
+        edit: (r: EditRequest) => editWithLocal(settings, r),
+      };
+    case 'gemini':
+      return {
+        translate: (r: PageRequest) => translateWithGemini(settings, r),
+        edit: (r: EditRequest) => editWithGemini(settings, r),
+      };
+    default:
+      return {
+        translate: (r: PageRequest) => translateWithClaude(settings, r),
+        edit: (r: EditRequest) => editWithClaude(settings, r),
+      };
+  }
+}
+
+/** QC findings worth sending back to the editor. */
+const FIXABLE = new Set<QcIssue['kind']>(['leftover-source', 'untranslated', 'too-long']);
+
+/**
+ * The localisation workflow for one page:
+ *  1. translation & adaptation (vision model reads and translates the page)
+ *  2. editing & proofreading (text-only editor pass over the whole page script)
+ *  3. image cleaning (flat fill for plain balloons, inpainting over artwork)
+ *  4. typesetting and 5. SFX handling happen at render time from the data produced here
+ *  6. quality control (automatic checks; fixable problems go back to the editor once)
+ */
 async function runPipeline(blob: Blob, settings: Settings, context: string): Promise<PageTranslation> {
   const bitmap = await decodeImage(blob);
   try {
     const { width, height } = bitmap;
     if (width < 16 || height < 16) throw new TranslateError('image', 'The image is too small to translate.');
+    const usage: Usage = { inputTokens: 0, outputTokens: 0 };
+    const steps: string[] = [];
+    let model = activeModel(settings);
+    const { translate, edit } = engine(settings);
+    const count = (r: { usage: Usage; model: string }) => {
+      usage.inputTokens += r.usage.inputTokens;
+      usage.outputTokens += r.usage.outputTokens;
+      model = r.model;
+    };
+
+    // 1. Translation and adaptation.
     const tiles = planTiles(width, height);
     const system = buildSystemPrompt(settings);
-    const usage: Usage = { inputTokens: 0, outputTokens: 0 };
-    let model = activeModel(settings);
-    const translate = (req: PageRequest): Promise<PageResponse> =>
-      settings.provider === 'local'
-        ? translateWithLocal(settings, req)
-        : settings.provider === 'gemini'
-          ? translateWithGemini(settings, req)
-          : translateWithClaude(settings, req);
-
     const results: TileResult[] = await Promise.all(
       tiles.map(async (tile, i) => {
         const encoded = await encodeTile(bitmap, tile, settings.maxImageEdge);
@@ -129,18 +184,83 @@ async function runPipeline(blob: Blob, settings: Settings, context: string): Pro
             mediaType: encoded.mediaType,
           }),
         );
-        usage.inputTokens += res.usage.inputTokens;
-        usage.outputTokens += res.usage.outputTokens;
-        model = res.model;
+        count(res);
         return { tile, sentW: encoded.width, sentH: encoded.height, blocks: res.output.blocks };
       }),
     );
+    let blocks = finalizeBlocks(assembleBlocks(results), width, height, backgroundSampler(bitmap));
+    steps.push('translate');
+    if (settings.sfxStyle === 'none') blocks = blocks.filter((b) => b.kind !== 'sfx');
 
-    const blocks = finalizeBlocks(assembleBlocks(results), width, height, backgroundSampler(bitmap));
-    return { width, height, blocks, model, targetLang: settings.targetLang, createdAt: Date.now(), usage };
+    // 2. Editing and proofreading, and 6. quality control with one fix round.
+    let qc: QcIssue[] = [];
+    if (blocks.length && settings.workflow === 'full') {
+      const editorSystem = buildEditorPrompt(settings);
+      const runEditor = async (issues?: string[]) => {
+        const lines: ScriptLine[] = blocks.map((b, id) => ({
+          id,
+          kind: b.kind,
+          original: b.original,
+          translation: b.translation,
+          emphasis: b.emphasis ?? 'normal',
+          note: b.note ?? '',
+          capacity: balloonCapacity(b, width, height),
+        }));
+        const res: EditResponse = await semaphore.run(() =>
+          edit({ system: editorSystem, userText: buildEditorUserText(lines, context, issues) }),
+        );
+        count(res);
+        blocks = applyEdits(blocks, res.output.blocks);
+      };
+      try {
+        await runEditor();
+        steps.push('edit');
+        qc = runQc(blocks, width, height, settings.targetLang);
+        const fixable = qc.filter((i) => FIXABLE.has(i.kind));
+        if (fixable.length) {
+          await runEditor(fixable.map((i) => i.message));
+          qc = runQc(blocks, width, height, settings.targetLang);
+        }
+      } catch (err) {
+        // A failed editing pass keeps the draft translation instead of failing the page.
+        const e = toTranslateError(err);
+        qc = [...runQc(blocks, width, height, settings.targetLang), { block: -1, kind: 'editor', message: `Editing pass skipped: ${e.message}` }];
+      }
+    } else {
+      qc = runQc(blocks, width, height, settings.targetLang);
+    }
+    steps.push('qc');
+
+    // 3. Image cleaning (and the ink colour used to redraw replaced SFX).
+    if (settings.cleaning === 'auto') {
+      blocks = await Promise.all(
+        blocks.map(async (b) => {
+          if (b.kind === 'sfx' && settings.sfxStyle !== 'replace') return b;
+          const res = await cleanBlock(bitmap, toPixelBox(b.textRect, width, height), b.kind === 'sfx').catch(() => null);
+          if (!res) return b;
+          return { ...b, ink: toHex(res.ink), ...(res.patch ? { clean: res.patch } : {}) };
+        }),
+      );
+      steps.push('clean');
+    }
+
+    return { width, height, blocks, model, targetLang: settings.targetLang, createdAt: Date.now(), usage, qc, steps };
   } finally {
     bitmap.close();
   }
+}
+
+/** Merge the editor's revisions into the blocks (matched by id = position). */
+export function applyEdits(
+  blocks: TranslatedBlock[],
+  edits: { id: number; translation: string; emphasis: TranslatedBlock['emphasis']; note: string }[],
+): TranslatedBlock[] {
+  const byId = new Map(edits.map((e) => [e.id, e]));
+  return blocks.map((b, i) => {
+    const e = byId.get(i);
+    if (!e || !e.translation.trim()) return b;
+    return { ...b, translation: e.translation.trim(), emphasis: e.emphasis ?? b.emphasis, note: e.note?.trim() ?? b.note };
+  });
 }
 
 const STATS_KEY = 'stats';

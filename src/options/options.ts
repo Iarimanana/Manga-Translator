@@ -67,6 +67,7 @@ function updatePreview(): void {
   bubble.style.fontFamily = fontStack(settings);
   bubble.style.fontSize = `${15 * settings.fontScale}px`;
   bubble.style.opacity = String(settings.overlayOpacity);
+  bubble.style.textTransform = settings.letteringCase === 'upper' ? 'uppercase' : 'none';
   updateOutputs();
 }
 

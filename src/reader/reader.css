@@ -173,3 +173,16 @@ main {
     transform: rotate(360deg);
   }
 }
+
+.state.warn {
+  color: var(--warn);
+}
+
+.qc {
+  margin: 0;
+  padding: 8px 12px 8px 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 12%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  font-size: 12.5px;
+}
