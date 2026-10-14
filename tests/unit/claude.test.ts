@@ -42,7 +42,7 @@ const message = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const request = { system: 'SYSTEM', userText: 'USER', imageBase64: 'QUJD', mediaType: 'image/jpeg' as const };
+const request = { width: 800, height: 1200, system: 'SYSTEM', userText: 'USER', imageBase64: 'QUJD', mediaType: 'image/jpeg' as const };
 const base = { apiKey: 'sk-ant-test', baseURL: '', effort: 'low' as const, useFallbacks: true };
 
 afterEach(() => setFetchForTesting(undefined));

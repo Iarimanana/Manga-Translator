@@ -24,3 +24,9 @@ export const ModelOutputSchema = z.object({
 
 export type ModelBlock = z.infer<typeof ModelBlockSchema>;
 export type ModelOutput = z.infer<typeof ModelOutputSchema>;
+
+/** Plain JSON Schema for APIs that take one directly (OpenAI-compatible servers, Gemini). */
+export function modelOutputJsonSchema(): Record<string, unknown> {
+  const { $schema: _ignored, ...schema } = z.toJSONSchema(ModelOutputSchema) as Record<string, unknown>;
+  return schema;
+}

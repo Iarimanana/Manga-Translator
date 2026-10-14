@@ -2,7 +2,7 @@
 
 # Manga Translator 🍓
 
-A Chrome extension that translates manga, manhwa and manhua **in place**, on any website, and also translates PDF, ZIP/CBZ and image files. It is an open-source rebuild of the features of the *Manga Translator 🍓 / Ichigo Reader* extension. Text detection, OCR and translation are done either by a **free local vision model on your own computer** (Ollama or LM Studio) or by **Claude** through your own Anthropic API key. There is no account or subscription.
+A Chrome extension that translates manga, manhwa and manhua **in place**, on any website, and also translates PDF, ZIP/CBZ and image files. It is an open-source rebuild of the features of the *Manga Translator 🍓 / Ichigo Reader* extension. Text detection, OCR and translation are done by the engine you choose: **Google Gemini's free tier**, a **free local vision model on your own computer** (Ollama or LM Studio), or **Claude** with your own Anthropic API key. There is no account or subscription.
 
 | Ichigo feature | This extension |
 | --- | --- |
@@ -11,7 +11,7 @@ A Chrome extension that translates manga, manhwa and manhua **in place**, on any
 | Japanese / Korean / Chinese → English | ✅ Plus 34 other target languages, and English comics into other languages |
 | Upload PDF, ZIP and images | ✅ The **file translator** handles PDF, ZIP/CBZ and JPG/PNG/WebP/AVIF/GIF, and can **export a translated ZIP** |
 | Full context on PDFs/ZIPs | ✅ Each page is sent with the previous page's dialogue so names and terms stay consistent |
-| Subscription / free trial | Free with a local model, or bring your own Anthropic API key and pay only for what you translate |
+| Subscription / free trial | Free with Gemini's free tier or a local model, or bring your own Anthropic API key and pay only for what you translate |
 
 ## Features
 
@@ -34,7 +34,15 @@ npm run build          # outputs the unpacked extension to dist/
 2. The settings page opens. Choose a translation engine (see below) and click **Test connection**.
 3. Open a manga page and hover an image, or press `Alt+Shift+M`.
 
-### Option A: free local model (Ollama)
+### Option A: Google Gemini free tier (easiest free option)
+
+1. Open [Google AI Studio → API keys](https://aistudio.google.com/apikey), sign in and click **Create API key**. No payment method is needed.
+2. In settings choose **Google Gemini (free tier)**, paste the key and click **Test connection**.
+3. Model: `gemini-flash-latest` reads best; `gemini-flash-lite-latest` has a larger free daily allowance. **Load models** lists every model your key can use.
+
+Free-tier limits change often: roughly 10 requests a minute and a per-model daily cap that ranges from a few dozen to several hundred requests. Each page is one request (very tall webtoon images use a few), and cached pages are free. The extension waits and retries automatically when it hits the per-minute limit, and tells you when the daily quota is used up. Check your real limits in [AI Studio → Usage](https://aistudio.google.com/usage). On the free tier, Google may use the pages you send to improve its products.
+
+### Option B: free local model (Ollama)
 
 1. Install [Ollama](https://ollama.com/download).
 2. Download a vision model: `ollama pull qwen2.5vl:7b` (about 6 GB, needs about 8 GB of RAM/VRAM). Use `qwen2.5vl:3b` on smaller machines, or `qwen2.5vl:32b` / `qwen3-vl:8b` if you have the hardware.
@@ -43,7 +51,7 @@ npm run build          # outputs the unpacked extension to dist/
 
 LM Studio and other OpenAI-compatible servers (llama.cpp, vLLM) work too: set the server URL (LM Studio uses `http://localhost:1234/v1`) and the model name. Local pages are translated one at a time. Lower *Image resolution sent to the model* to 1024–1280 if it's slow. Local models are noticeably less accurate than Claude, especially on small or vertical Japanese text.
 
-### Option B: Claude
+### Option C: Claude
 
 Paste an [Anthropic API key](https://console.anthropic.com/settings/keys) with credit. A Claude.ai Pro/Max subscription can't be used by third-party tools.
 
@@ -86,7 +94,7 @@ draw overlay  ◀──────────────────  PageTra
 (fit text to balloon, track scroll/resize/clipping)
 ```
 
-- `src/background/` — service worker. The Claude call uses the official `@anthropic-ai/sdk` with structured outputs. `local.ts` talks to OpenAI-compatible local servers and repairs messy model JSON. Also image loading, tiling, cache (IndexedDB), context menu and shortcuts.
+- `src/background/` — service worker. The Claude call uses the official `@anthropic-ai/sdk` with structured outputs. `gemini.ts` calls the Gemini REST API (0–1000 box coordinates, free-tier retry handling). `local.ts` talks to OpenAI-compatible local servers and repairs messy model JSON. Also image loading, tiling, cache (IndexedDB), context menu and shortcuts.
 - `src/content/` — on-page UI in a shadow DOM: hover button, overlays, area selection frames, auto-translate observers.
 - `src/reader/` — file translator (pdf.js, fflate) and export.
 - `src/shared/` — pure logic shared by all of the above: geometry and slicing, text fitting and layout, colour sampling, prompt, settings.

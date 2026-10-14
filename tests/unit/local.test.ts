@@ -5,7 +5,7 @@ import { parseLocalOutput, setLocalFetchForTesting, testLocal, translateWithLoca
 afterEach(() => setLocalFetchForTesting(undefined));
 
 const settings = { localBaseURL: 'http://localhost:11434/v1', localModel: 'qwen2.5vl:7b' };
-const request = { system: 'SYSTEM', userText: 'USER', imageBase64: 'QUJD', mediaType: 'image/jpeg' as const };
+const request = { width: 800, height: 1200, system: 'SYSTEM', userText: 'USER', imageBase64: 'QUJD', mediaType: 'image/jpeg' as const };
 
 describe('parseLocalOutput', () => {
   it('accepts exact schema output', () => {

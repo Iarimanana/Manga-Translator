@@ -22,6 +22,10 @@
         <h2>Translation engine</h2>
         <div class="choice" role="radiogroup">
           <label class="option">
+            <input type="radio" name="provider" value="gemini" />
+            <span><strong>Google Gemini (free tier)</strong><br /><small class="muted">Free with a Google AI Studio key, fast, and good at reading manga text. Limited number of pages per day; on the free tier Google may use the pages you send to improve its products.</small></span>
+          </label>
+          <label class="option">
             <input type="radio" name="provider" value="local" />
             <span><strong>Local model on this computer</strong><br /><small class="muted">Free and private. Runs on your own GPU/CPU with Ollama or LM Studio; less accurate than Claude, especially on small vertical text.</small></span>
           </label>
@@ -29,6 +33,42 @@
             <input type="radio" name="provider" value="claude" />
             <span><strong>Claude (Anthropic API)</strong><br /><small class="muted">Best quality. Needs an Anthropic API key with credit (a Claude.ai subscription can't be used).</small></span>
           </label>
+        </div>
+      </section>
+
+      <section class="card" id="gemini">
+        <h2>Google Gemini</h2>
+        <ol class="steps">
+          <li>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio → API keys</a> and sign in with a Google account.</li>
+          <li>Click <strong>Create API key</strong> and copy it. No payment method is needed for the free tier.</li>
+          <li>Paste it below and click <strong>Test connection</strong>.</li>
+        </ol>
+        <label class="field">
+          <span>Gemini API key</span>
+          <div class="inline">
+            <input type="password" data-key="geminiApiKey" id="geminiApiKey" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+            <button class="toggle-secret" type="button" data-for="geminiApiKey">Show</button>
+          </div>
+        </label>
+        <label class="field">
+          <span>Model <small class="muted">— Flash reads better; Flash-Lite has a bigger free daily allowance. Click “Load models” to see everything your key can use.</small></span>
+          <div class="inline">
+            <input type="text" data-key="geminiModel" id="geminiModel" list="gemini-models" spellcheck="false" />
+            <button type="button" id="load-gemini-models">Load models</button>
+          </div>
+          <datalist id="gemini-models"></datalist>
+        </label>
+        <p class="muted">Free-tier limits change often: roughly 10 pages a minute and a daily cap that depends on the model (from a few dozen to several hundred pages). Your current limits are shown in <a href="https://aistudio.google.com/usage" target="_blank" rel="noopener">AI Studio → Usage</a>. Each page is one request (very tall webtoon images use a few); cached pages are free.</p>
+        <details>
+          <summary>Advanced</summary>
+          <label class="field">
+            <span>Gemini API base URL</span>
+            <input type="url" data-key="geminiBaseURL" spellcheck="false" />
+          </label>
+        </details>
+        <div class="inline">
+          <button class="primary test" type="button">Test connection</button>
+          <span class="test-result muted"></span>
         </div>
       </section>
 
@@ -78,7 +118,7 @@
           <span>API key</span>
           <div class="inline">
             <input type="password" data-key="apiKey" id="apiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
-            <button id="toggle-key" type="button">Show</button>
+            <button class="toggle-secret" type="button" data-for="apiKey">Show</button>
           </div>
         </label>
         <label class="field">

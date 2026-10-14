@@ -1,6 +1,6 @@
 export type Effort = 'low' | 'medium' | 'high';
 export type FontChoice = 'comic' | 'sans' | 'serif' | 'custom';
-export type Provider = 'claude' | 'local';
+export type Provider = 'claude' | 'gemini' | 'local';
 
 export interface Settings {
   /** Which engine reads and translates pages. */
@@ -9,6 +9,11 @@ export interface Settings {
   localBaseURL: string;
   /** Vision model name on the local server. */
   localModel: string;
+  /** Google AI Studio API key (free tier works). Stored only on this device. */
+  geminiApiKey: string;
+  geminiModel: string;
+  /** Gemini API root; only changed for proxies and tests. */
+  geminiBaseURL: string;
   /** Anthropic API key. Stored only in chrome.storage.local on this device. */
   apiKey: string;
   model: string;
@@ -62,8 +67,19 @@ export const LOCAL_PRESETS = [
 /** Vision models that read manga text reasonably well, smallest first. */
 export const LOCAL_MODEL_SUGGESTIONS = ['qwen2.5vl:3b', 'qwen2.5vl:7b', 'qwen3-vl:8b', 'gemma3:12b', 'qwen2.5vl:32b'];
 
+export const GEMINI_DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+/** Aliases Google keeps pointed at its current Flash models; any model ID from the list also works. */
+export const GEMINI_MODEL_SUGGESTIONS = [
+  { id: 'gemini-flash-latest', label: 'Gemini Flash (latest) — better reading, smaller free daily quota' },
+  { id: 'gemini-flash-lite-latest', label: 'Gemini Flash-Lite (latest) — larger free daily quota, less accurate' },
+];
+
 export const DEFAULT_SETTINGS: Settings = {
   provider: 'claude',
+  geminiApiKey: '',
+  geminiModel: 'gemini-flash-latest',
+  geminiBaseURL: GEMINI_DEFAULT_BASE,
   localBaseURL: 'http://localhost:11434/v1',
   localModel: 'qwen2.5vl:7b',
   apiKey: '',
@@ -107,7 +123,10 @@ export function normalizeSettings(raw: Partial<Settings> | undefined | null): Se
   s.autoSites = Array.isArray(s.autoSites) ? s.autoSites.filter((x) => typeof x === 'string') : [];
   s.disabledSites = Array.isArray(s.disabledSites) ? s.disabledSites.filter((x) => typeof x === 'string') : [];
   s.model = (s.model || DEFAULT_SETTINGS.model).trim();
-  if (s.provider !== 'local') s.provider = 'claude';
+  if (!['claude', 'gemini', 'local'].includes(s.provider)) s.provider = 'claude';
+  s.geminiApiKey = (s.geminiApiKey || '').trim();
+  s.geminiModel = (s.geminiModel || DEFAULT_SETTINGS.geminiModel).trim().replace(/^models\//, '');
+  s.geminiBaseURL = (s.geminiBaseURL || GEMINI_DEFAULT_BASE).trim().replace(/\/+$/, '');
   s.localBaseURL = (s.localBaseURL || DEFAULT_SETTINGS.localBaseURL).trim().replace(/\/+$/, '');
   s.localModel = (s.localModel || DEFAULT_SETTINGS.localModel).trim();
   s.apiKey = (s.apiKey || '').trim();
@@ -163,11 +182,22 @@ export function hostOf(url: string): string {
 }
 
 /** Model identifier actually used for translations (for cache keys and display). */
-export function activeModel(s: Pick<Settings, 'provider' | 'model' | 'localModel'>): string {
-  return s.provider === 'local' ? `local:${s.localModel}` : s.model;
+export function activeModel(s: Pick<Settings, 'provider' | 'model' | 'localModel' | 'geminiModel'>): string {
+  if (s.provider === 'local') return `local:${s.localModel}`;
+  if (s.provider === 'gemini') return `gemini:${s.geminiModel}`;
+  return s.model;
 }
 
 /** Whether the extension has what it needs to translate (an API key, or a local server). */
-export function isConfigured(s: Pick<Settings, 'provider' | 'apiKey'>): boolean {
-  return s.provider === 'local' || !!s.apiKey;
+export function isConfigured(s: Pick<Settings, 'provider' | 'apiKey' | 'geminiApiKey'>): boolean {
+  if (s.provider === 'local') return true;
+  if (s.provider === 'gemini') return !!s.geminiApiKey;
+  return !!s.apiKey;
+}
+
+/** Shown when the selected engine is missing its key. */
+export function missingKeyMessage(s: Pick<Settings, 'provider'>): string {
+  return s.provider === 'gemini'
+    ? 'Add your free Gemini API key in the extension settings to start translating.'
+    : 'Add your Anthropic API key in the extension settings to start translating.';
 }

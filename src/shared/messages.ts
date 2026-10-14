@@ -5,6 +5,7 @@ export type BackgroundRequest =
   | { type: 'translate'; source: ImageSource; context?: string; force?: boolean }
   | { type: 'captureViewport'; rect: ViewportRect; viewportW: number }
   | { type: 'testConnection' }
+  | { type: 'listGeminiModels' }
   | { type: 'clearCache' }
   | { type: 'getStats' }
   | { type: 'openReader' }

@@ -2,10 +2,11 @@ import { assembleBlocks, finalizeBlocks, type TileResult } from '../shared/assem
 import { planTiles } from '../shared/geometry';
 import type { Stats } from '../shared/messages';
 import { PROMPT_VERSION, buildSystemPrompt, buildUserText } from '../shared/prompt';
-import { activeModel, isConfigured, loadSettings, type Settings } from '../shared/settings';
+import { activeModel, isConfigured, loadSettings, missingKeyMessage, type Settings } from '../shared/settings';
 import type { ImageSource, PageTranslation, Usage } from '../shared/types';
 import { cacheCount, cacheGet, cachePut } from './cache';
 import { translateWithClaude, type PageRequest, type PageResponse } from './claude';
+import { translateWithGemini } from './gemini';
 import { translateWithLocal } from './local';
 import { TranslateError } from './errors';
 import { backgroundSampler, decodeImage, encodeTile, loadImageBlob, sha256Hex } from './image';
@@ -59,10 +60,11 @@ export interface TranslateOptions {
 export async function translateImage(opts: TranslateOptions): Promise<PageTranslation> {
   const settings = await loadSettings();
   if (!isConfigured(settings)) {
-    throw new TranslateError('no_api_key', 'Add your Anthropic API key in the extension settings to start translating.');
+    throw new TranslateError('no_api_key', missingKeyMessage(settings));
   }
-  // A local GPU handles one page at a time; queueing beats thrashing it.
-  semaphore.limit = settings.provider === 'local' ? 1 : settings.concurrency;
+  // A local GPU handles one page at a time; Gemini's free tier allows ~10 requests a minute.
+  semaphore.limit =
+    settings.provider === 'local' ? 1 : settings.provider === 'gemini' ? Math.min(2, settings.concurrency) : settings.concurrency;
 
   const blob = await loadImageBlob(opts.source);
   const bytes = await blob.arrayBuffer();
@@ -100,7 +102,11 @@ async function runPipeline(blob: Blob, settings: Settings, context: string): Pro
     const usage: Usage = { inputTokens: 0, outputTokens: 0 };
     let model = activeModel(settings);
     const translate = (req: PageRequest): Promise<PageResponse> =>
-      settings.provider === 'local' ? translateWithLocal(settings, req) : translateWithClaude(settings, req);
+      settings.provider === 'local'
+        ? translateWithLocal(settings, req)
+        : settings.provider === 'gemini'
+          ? translateWithGemini(settings, req)
+          : translateWithClaude(settings, req);
 
     const results: TileResult[] = await Promise.all(
       tiles.map(async (tile, i) => {
@@ -111,9 +117,12 @@ async function runPipeline(blob: Blob, settings: Settings, context: string): Pro
           tileIndex: i,
           tileCount: tiles.length,
           context: i === 0 ? context : undefined,
+          coords: settings.provider === 'gemini' ? 'normalized' : 'pixels',
         });
         const res = await semaphore.run(() =>
           translate({
+            width: encoded.width,
+            height: encoded.height,
             system,
             userText,
             imageBase64: encoded.base64,

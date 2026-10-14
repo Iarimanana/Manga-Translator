@@ -2,6 +2,7 @@ import { SOURCE_LANGUAGES, TARGET_LANGUAGES } from '../shared/languages';
 import type { Stats } from '../shared/messages';
 import { ensureFont } from '../shared/render';
 import {
+  GEMINI_MODEL_SUGGESTIONS,
   LOCAL_MODEL_SUGGESTIONS,
   MODEL_OPTIONS,
   fontStack,
@@ -56,6 +57,7 @@ function updateOutputs(): void {
 
 function updateProvider(): void {
   $('local').classList.toggle('hidden', settings.provider !== 'local');
+  $('gemini').classList.toggle('hidden', settings.provider !== 'gemini');
   $('api').classList.toggle('hidden', settings.provider !== 'claude');
   for (const r of document.querySelectorAll<HTMLInputElement>('input[name=provider]')) r.checked = r.value === settings.provider;
 }
@@ -114,10 +116,32 @@ async function main(): Promise<void> {
   }
   updatePreview();
 
-  $('toggle-key').addEventListener('click', () => {
-    const input = $<HTMLInputElement>('apiKey');
-    input.type = input.type === 'password' ? 'text' : 'password';
-    $('toggle-key').textContent = input.type === 'password' ? 'Show' : 'Hide';
+  for (const b of document.querySelectorAll<HTMLButtonElement>('button.toggle-secret')) {
+    b.addEventListener('click', () => {
+      const input = $<HTMLInputElement>(b.dataset.for!);
+      input.type = input.type === 'password' ? 'text' : 'password';
+      b.textContent = input.type === 'password' ? 'Show' : 'Hide';
+    });
+  }
+
+  for (const m of GEMINI_MODEL_SUGGESTIONS) $('gemini-models').appendChild(new Option(m.label, m.id));
+  $('load-gemini-models').addEventListener('click', async () => {
+    const out = $('gemini').querySelector<HTMLElement>('.test-result')!;
+    out.className = 'test-result muted';
+    out.textContent = 'Loading models…';
+    const res = (await chrome.runtime.sendMessage({ type: 'listGeminiModels' })) as
+      | { ok: true; models: string[] }
+      | { ok: false; error: string };
+    if (!res.ok) {
+      out.className = 'test-result err';
+      out.textContent = res.error;
+      return;
+    }
+    const list = $('gemini-models');
+    list.replaceChildren(...GEMINI_MODEL_SUGGESTIONS.map((m) => new Option(m.label, m.id)));
+    for (const id of res.models) list.appendChild(new Option(id, id));
+    out.className = 'test-result ok';
+    out.textContent = `${res.models.length} models available — pick one in the Model box.`;
   });
 
   for (const btn of document.querySelectorAll<HTMLButtonElement>('button.test')) {

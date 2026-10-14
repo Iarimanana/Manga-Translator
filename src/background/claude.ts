@@ -30,6 +30,9 @@ export function createClient(s: ClientSettings): Anthropic {
 }
 
 export interface PageRequest {
+  /** Size of the image being sent, in pixels. */
+  width: number;
+  height: number;
   system: string;
   userText: string;
   imageBase64: string;

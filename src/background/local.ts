@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { ModelOutputSchema, type ModelOutput } from '../shared/schema';
+import { ModelOutputSchema, modelOutputJsonSchema, type ModelOutput } from '../shared/schema';
 import type { Settings } from '../shared/settings';
 import { TEXT_KINDS, type TextKind } from '../shared/types';
 import type { PageRequest, PageResponse } from './claude';
@@ -21,7 +20,7 @@ export function setLocalFetchForTesting(f: typeof fetch | undefined): void {
 export const LOCAL_FORMAT_HINT = `Reply with JSON only, no other text, exactly in this shape:
 {"blocks":[{"kind":"speech","text_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"bubble_box":{"x_min":0,"y_min":0,"x_max":0,"y_max":0},"original":"...","translation":"..."}]}`;
 
-const RESPONSE_SCHEMA = z.toJSONSchema(ModelOutputSchema);
+const RESPONSE_SCHEMA = modelOutputJsonSchema();
 const TIMEOUT_MS = 10 * 60 * 1000;
 
 function friendlyNetworkError(base: string, err: unknown): TranslateError {

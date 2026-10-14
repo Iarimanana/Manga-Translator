@@ -65,7 +65,13 @@ async function main(): Promise<void> {
 
   const model = MODEL_OPTIONS.find((m) => m.id === settings.model);
   $('model').textContent =
-    settings.provider === 'local' ? `Local: ${settings.localModel}` : model ? model.label.split(' — ')[0] : settings.model;
+    settings.provider === 'local'
+      ? `Local: ${settings.localModel}`
+      : settings.provider === 'gemini'
+        ? `Gemini: ${settings.geminiModel}`
+        : model
+          ? model.label.split(' — ')[0]
+          : settings.model;
   chrome.runtime.sendMessage({ type: 'getStats' }).then((res: { ok: boolean; stats: Stats }) => {
     if (res?.ok) {
       const u = res.stats.usage;

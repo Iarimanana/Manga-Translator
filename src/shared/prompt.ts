@@ -2,7 +2,7 @@ import { sourceLanguage, targetLanguage } from './languages';
 import type { PageTranslation } from './types';
 
 /** Bump when the prompt or schema changes so stale cache entries are not reused. */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export interface PromptOptions {
   targetLang: string;
@@ -24,7 +24,7 @@ export function buildSystemPrompt(o: PromptOptions): string {
     '',
     'For every piece of text, return one block with:',
     '- kind: "speech" (speech balloon), "thought" (thought balloon), "narration" (caption or narration box), "sfx" (sound effect drawn into the art), "sign" (signs, screens, letters, labels inside the scene) or "other".',
-    '- text_box: the tight box around the original lettering, in pixel coordinates of the image you were given (origin top-left, x to the right, y downwards).',
+    '- text_box: the tight box around the original lettering, in the coordinate system described in the request (origin top-left, x to the right, y downwards).',
     '- bubble_box: the box of the inside of the balloon or caption that contains the text, i.e. the blank area a letterer could fill with the translation. For text with no balloon, use the text box.',
     '- original: the exact transcription of the original text. Join vertical columns and line breaks in reading order.',
     `- translation: a natural, fluent ${target} rendering, written the way an official localisation would letter it. Keep the tone, personality and emphasis (…, !, ?) of each speaker, keep names consistent, and do not add notes or explanations.`,
@@ -50,10 +50,16 @@ export interface UserTextOptions {
   tileIndex: number;
   tileCount: number;
   context?: string;
+  /** 'normalized' asks for 0–1000 coordinates (what Gemini is trained to produce). */
+  coords?: 'pixels' | 'normalized';
 }
 
 export function buildUserText(o: UserTextOptions): string {
-  const lines = [`The image is ${o.width}×${o.height} pixels. Return boxes in that coordinate space.`];
+  const lines = [
+    o.coords === 'normalized'
+      ? `The image is ${o.width}×${o.height} pixels. Return every box in normalized coordinates from 0 to 1000: (0,0) is the top-left corner and (1000,1000) the bottom-right corner of the image, whatever its size.`
+      : `The image is ${o.width}×${o.height} pixels. Return boxes in pixel coordinates of this image.`,
+  ];
   if (o.tileCount > 1) {
     lines.push(
       `This is slice ${o.tileIndex + 1} of ${o.tileCount} of a long vertical strip, sliced top to bottom with some overlap between slices.`,

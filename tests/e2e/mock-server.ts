@@ -123,6 +123,41 @@ export async function startMockServer(): Promise<MockServer> {
       }
       return json(res, 200, messagesResponse(body));
     }
+    // Google Gemini (Generative Language API), answering with 0–1000 normalised boxes.
+    const gem = url.pathname.match(/^\/gemini\/v1beta\/models(?:\/([^:]+))?(?::(generateContent))?$/);
+    if (gem) {
+      if (req.headers['x-goog-api-key'] !== 'AIza-test') {
+        return json(res, 400, { error: { code: 400, message: 'API key not valid.', details: [{ reason: 'API_KEY_INVALID' }] } });
+      }
+      if (gem[2] === 'generateContent') {
+        const body = JSON.parse(raw);
+        apiRequests.push({ path: url.pathname, headers: req.headers, body });
+        const out = {
+          blocks: [
+            {
+              kind: 'speech',
+              text_box: { x_min: 420, y_min: 120, x_max: 580, y_max: 300 },
+              bubble_box: { x_min: 320, y_min: 70, x_max: 680, y_max: 350 },
+              original: '待ってくれ！',
+              translation: MOCK_TRANSLATION,
+            },
+          ],
+        };
+        return json(res, 200, {
+          candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify(out) }] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1100, candidatesTokenCount: 120 },
+          modelVersion: gem[1],
+        });
+      }
+      if (gem[1]) return json(res, 200, { name: `models/${gem[1]}`, displayName: 'Gemini Mock Flash' });
+      return json(res, 200, {
+        models: [
+          { name: 'models/gemini-flash-latest', supportedGenerationMethods: ['generateContent'] },
+          { name: 'models/gemini-flash-lite-latest', supportedGenerationMethods: ['generateContent'] },
+        ],
+      });
+    }
+
     // OpenAI-compatible local server (what Ollama and LM Studio expose).
     if (url.pathname === '/v1/chat/completions' && req.method === 'POST') {
       const body = JSON.parse(raw);

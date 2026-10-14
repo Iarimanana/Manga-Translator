@@ -2,6 +2,7 @@ import type { BackgroundRequest, CaptureResponse, ContentCommand, TranslateRespo
 import { isConfigured, loadSettings } from '../shared/settings';
 import { cacheClear } from './cache';
 import { testConnection } from './claude';
+import { listGeminiModels, testGemini } from './gemini';
 import { testLocal } from './local';
 import { toTranslateError } from './errors';
 import { blobToDataUrl, cropScreenshot } from './image';
@@ -101,9 +102,16 @@ async function handle(msg: BackgroundRequest, sender: chrome.runtime.MessageSend
     }
     case 'testConnection': {
       const settings = await loadSettings();
-      const name = settings.provider === 'local' ? await testLocal(settings) : await testConnection(settings);
+      const name =
+        settings.provider === 'local'
+          ? await testLocal(settings)
+          : settings.provider === 'gemini'
+            ? await testGemini(settings)
+            : await testConnection(settings);
       return { ok: true, name };
     }
+    case 'listGeminiModels':
+      return { ok: true, models: await listGeminiModels(await loadSettings()) };
     case 'clearCache':
       await cacheClear();
       return { ok: true };
